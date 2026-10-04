@@ -14,25 +14,26 @@ object BotController {
     @Volatile var lastStatus: String = "Idle"
         private set
 
-    private var lastHead: Cell? = null
-    private var currentDirection: Direction? = null
+    private var head: Cell? = null
+    private var currentDirection: Direction = Direction.RIGHT
     private var lastGestureAt = 0L
     private var lastGestureDirection: Direction? = null
 
     fun start() {
-        lastHead = null
-        currentDirection = null
+        head = null
+        // Fresh Classic runs in the Play Store build start moving right.
+        currentDirection = Direction.RIGHT
         lastGestureAt = 0L
         lastGestureDirection = null
         running.set(true)
-        lastStatus = "Auto board | finding head..."
+        lastStatus = "Fresh-run mode | finding snake..."
         SnakeAccessibilityService.instance?.refreshOverlay()
     }
 
     fun stop() {
         running.set(false)
-        lastHead = null
-        currentDirection = null
+        head = null
+        currentDirection = Direction.RIGHT
         lastStatus = "Stopped"
         SnakeAccessibilityService.instance?.refreshOverlay()
     }
@@ -47,44 +48,48 @@ object BotController {
         ) ?: Prefs.boardBounds(context)
 
         if (bounds == null) {
-            lastStatus = "Auto board unavailable - tap CAL"
-            SnakeAccessibilityService.instance?.refreshOverlay()
+            setStatus("Auto board unavailable - tap CAL")
             return
         }
 
         val spec = Prefs.boardSpec(context)
-        val head = headDetector.detect(source, bounds, spec)
-        if (head == null) {
-            lastStatus = "Auto board | head not found"
-            SnakeAccessibilityService.instance?.refreshOverlay()
-            return
+        var tracked = head
+
+        if (tracked == null) {
+            tracked = headDetector.detectInitial(source, bounds, spec)
+            if (tracked == null) {
+                setStatus("Auto board | finding snake...")
+                return
+            }
+            head = tracked
+        } else {
+            val expected = tracked.move(currentDirection)
+            if (expected.x in 0 until spec.columns &&
+                expected.y in 0 until spec.rows &&
+                headDetector.isSnakeCell(source, bounds, spec, expected)
+            ) {
+                tracked = expected
+                head = expected
+            }
         }
 
-        val previous = lastHead
-        if (previous != null && previous != head) {
-            inferDirection(previous, head)?.let { currentDirection = it }
-        }
-        lastHead = head
-
-        val desired = cycleDirection(head, spec)
+        val desired = cycleDirection(tracked, spec)
         if (desired == null) {
-            lastStatus = "Head " + head.x + "," + head.y + " | no route"
-            SnakeAccessibilityService.instance?.refreshOverlay()
+            setStatus("Head " + tracked.x + "," + tracked.y + " | no route")
             return
         }
 
-        val observed = currentDirection
-        if (observed == null) {
-            lastStatus = "Head " + head.x + "," + head.y + " | learning direction..."
-            SnakeAccessibilityService.instance?.refreshOverlay()
+        setStatus(
+            "Head " + tracked.x + "," + tracked.y + " | " +
+                currentDirection.name + " -> " + desired.name
+        )
+
+        if (desired == currentDirection) return
+        if (desired == currentDirection.opposite) {
+            // This should not occur on a correctly tracked fresh Hamiltonian
+            // run. Holding course is safer than sending an illegal reverse.
             return
         }
-
-        lastStatus = "Head " + head.x + "," + head.y + " | " +
-            observed.name + " -> " + desired.name
-        SnakeAccessibilityService.instance?.refreshOverlay()
-
-        if (desired == observed || desired == observed.opposite) return
 
         val now = SystemClock.elapsedRealtime()
         if (now - lastGestureAt < 45L) return
@@ -93,21 +98,15 @@ object BotController {
         SnakeAccessibilityService.instance?.swipe(desired, bounds)
         lastGestureAt = now
         lastGestureDirection = desired
-
-        // Snake Classic accepts queued turns quickly; treating the dispatched
-        // turn as current immediately prevents duplicate swipes while waiting
-        // for the next visual tick.
         currentDirection = desired
+        setStatus(
+            "TURN " + desired.name + " @ " + tracked.x + "," + tracked.y
+        )
     }
 
-    private fun inferDirection(from: Cell, to: Cell): Direction? {
-        return when {
-            to.y == from.y && to.x > from.x -> Direction.RIGHT
-            to.y == from.y && to.x < from.x -> Direction.LEFT
-            to.x == from.x && to.y > from.y -> Direction.DOWN
-            to.x == from.x && to.y < from.y -> Direction.UP
-            else -> null
-        }
+    private fun setStatus(value: String) {
+        lastStatus = value
+        SnakeAccessibilityService.instance?.refreshOverlay()
     }
 
     private fun cycleDirection(head: Cell, spec: BoardSpec): Direction? {
