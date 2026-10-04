@@ -9,35 +9,50 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
 /**
- * Small transparent activity used when START is pressed from the accessibility
- * overlay and screen capture has not been granted yet. Android requires an
- * Activity to show the MediaProjection consent dialog, so this bridges the
- * floating overlay to the system permission prompt and then immediately
- * returns the user to Snake Classic.
+ * Transparent bridge for Android's MediaProjection consent dialog.
+ *
+ * START can force a fresh capture session. This matters on Samsung/Android
+ * after updating the APK: the foreground capture service can still exist
+ * while its old projection has stopped delivering frames.
  */
 class CapturePermissionActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_AUTO_START = "auto_start"
+        const val EXTRA_FORCE_CAPTURE = "force_capture"
         private const val REQUEST_CAPTURE = 2201
     }
 
     private var autoStart = false
+    private var forceCapture = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         autoStart = intent.getBooleanExtra(EXTRA_AUTO_START, false)
+        forceCapture = intent.getBooleanExtra(EXTRA_FORCE_CAPTURE, false)
 
-        if (CaptureService.instance != null) {
-            finishAfterCaptureAlreadyRunning()
+        if (forceCapture) {
+            BotController.stop()
+            CaptureService.instance?.stopSelf()
+        } else if (CaptureService.instance != null) {
+            if (autoStart) BotController.start()
+            finish()
             return
         }
 
-        val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_CAPTURE)
+        val manager =
+            getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        startActivityForResult(
+            manager.createScreenCaptureIntent(),
+            REQUEST_CAPTURE
+        )
     }
 
-    @Deprecated("Deprecated in Android API; kept for broad compatibility with the capture consent flow")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    @Deprecated("Kept for compatibility with the MediaProjection consent flow")
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?
+    ) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != REQUEST_CAPTURE) return
 
@@ -45,29 +60,21 @@ class CapturePermissionActivity : AppCompatActivity() {
             val service = Intent(this, CaptureService::class.java)
                 .putExtra(CaptureService.EXTRA_RESULT_CODE, resultCode)
                 .putExtra(CaptureService.EXTRA_DATA, data)
+
             ContextCompat.startForegroundService(this, service)
-            Toast.makeText(this, "Screen capture enabled", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                "Fresh screen capture enabled",
+                Toast.LENGTH_SHORT
+            ).show()
 
-            if (autoStart) {
-                if (Prefs.boardBounds(this) == null) {
-                    SnakeAccessibilityService.instance?.setOverlayStatus("Capture ON - tap CAL first")
-                } else {
-                    BotController.start()
-                }
-            }
+            // The Samsung board preset is applied from the first captured
+            // frame, so manual CAL is not required before arming the bot.
+            if (autoStart) BotController.start()
         } else {
-            SnakeAccessibilityService.instance?.setOverlayStatus("Screen capture permission cancelled")
-        }
-        finish()
-    }
-
-    private fun finishAfterCaptureAlreadyRunning() {
-        if (autoStart) {
-            if (Prefs.boardBounds(this) == null) {
-                SnakeAccessibilityService.instance?.setOverlayStatus("Tap CAL first")
-            } else {
-                BotController.start()
-            }
+            SnakeAccessibilityService.instance?.setOverlayStatus(
+                "Screen capture permission cancelled"
+            )
         }
         finish()
     }
