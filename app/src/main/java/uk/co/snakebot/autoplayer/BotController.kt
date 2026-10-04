@@ -15,16 +15,15 @@ object BotController {
         private set
 
     private var head: Cell? = null
-    private var currentDirection: Direction = Direction.RIGHT
     private var lastGestureAt = 0L
-    private var lastGestureDirection: Direction? = null
+    private var lastQueuedCornerIndex = -1
+    private var lastFallbackCornerIndex = -1
 
     fun start() {
         head = null
-        // Fresh Classic runs in the Play Store build start moving right.
-        currentDirection = Direction.RIGHT
         lastGestureAt = 0L
-        lastGestureDirection = null
+        lastQueuedCornerIndex = -1
+        lastFallbackCornerIndex = -1
         running.set(true)
         lastStatus = "Fresh-run mode | finding snake..."
         SnakeAccessibilityService.instance?.refreshOverlay()
@@ -33,7 +32,8 @@ object BotController {
     fun stop() {
         running.set(false)
         head = null
-        currentDirection = Direction.RIGHT
+        lastQueuedCornerIndex = -1
+        lastFallbackCornerIndex = -1
         lastStatus = "Stopped"
         SnakeAccessibilityService.instance?.refreshOverlay()
     }
@@ -53,8 +53,13 @@ object BotController {
         }
 
         val spec = Prefs.boardSpec(context)
-        var tracked = head
+        val cycle = HamiltonianCycle.build(spec.columns, spec.rows)
+        if (cycle == null || !HamiltonianCycle.isCycleValid(cycle, spec)) {
+            setStatus("No safe route for this board")
+            return
+        }
 
+        var tracked = head
         if (tracked == null) {
             tracked = headDetector.detectInitial(source, bounds, spec)
             if (tracked == null) {
@@ -63,58 +68,103 @@ object BotController {
             }
             head = tracked
         } else {
-            val expected = tracked.move(currentDirection)
-            if (expected.x in 0 until spec.columns &&
-                expected.y in 0 until spec.rows &&
-                headDetector.isSnakeCell(source, bounds, spec, expected)
-            ) {
-                tracked = expected
-                head = expected
+            // Catch up over several cells if MediaProjection/bitmap processing
+            // misses one or more visual ticks. Every skipped cell the head has
+            // just traversed is now part of the snake body, so the forward arc
+            // of the Hamiltonian route is a reliable recovery path.
+            val startIndex = cycle.indexOf(tracked)
+            if (startIndex >= 0) {
+                var best = tracked
+                for (step in 1..5) {
+                    val candidate = cycle[(startIndex + step) % cycle.size]
+                    if (headDetector.isSnakeCell(source, bounds, spec, candidate)) {
+                        best = candidate
+                    } else {
+                        break
+                    }
+                }
+                tracked = best
+                head = best
             }
         }
 
-        val desired = cycleDirection(tracked, spec)
-        if (desired == null) {
-            setStatus("Head " + tracked.x + "," + tracked.y + " | no route")
+        val index = cycle.indexOf(tracked)
+        if (index < 0) {
+            setStatus("Head lost | re-syncing...")
+            head = null
             return
         }
 
-        setStatus(
-            "Head " + tracked.x + "," + tracked.y + " | " +
-                currentDirection.name + " -> " + desired.name
-        )
+        val previous = cycle[(index - 1 + cycle.size) % cycle.size]
+        val next = cycle[(index + 1) % cycle.size]
+        val afterNext = cycle[(index + 2) % cycle.size]
 
-        if (desired == currentDirection) return
-        if (desired == currentDirection.opposite) {
-            // This should not occur on a correctly tracked fresh Hamiltonian
-            // run. Holding course is safer than sending an illegal reverse.
+        val incoming = Direction.between(previous, tracked, spec.columns, spec.rows)
+        val outgoing = Direction.between(tracked, next, spec.columns, spec.rows)
+        val nextOutgoing = Direction.between(next, afterNext, spec.columns, spec.rows)
+
+        if (incoming == null || outgoing == null || nextOutgoing == null) {
+            setStatus("Route sync error")
             return
         }
 
         val now = SystemClock.elapsedRealtime()
-        if (now - lastGestureAt < 45L) return
-        if (lastGestureDirection == desired && now - lastGestureAt < 140L) return
 
-        SnakeAccessibilityService.instance?.swipe(desired, bounds)
-        lastGestureAt = now
-        lastGestureDirection = desired
-        currentDirection = desired
+        // If the NEXT cell is a corner, fill Snake Classic's two-slot input
+        // buffer now: keep straight for one tick, then make the turn.
+        if (nextOutgoing != outgoing) {
+            val cornerIndex = (index + 1) % cycle.size
+            if (cornerIndex != lastQueuedCornerIndex && now - lastGestureAt >= 140L) {
+                SnakeAccessibilityService.instance?.queueCorner(
+                    outgoing,
+                    nextOutgoing,
+                    bounds
+                )
+                lastGestureAt = now
+                lastQueuedCornerIndex = cornerIndex
+                setStatus(
+                    "QUEUE " + outgoing.name + " -> " + nextOutgoing.name +
+                        " | corner " + next.x + "," + next.y
+                )
+                return
+            }
+        }
+
+        // Fallback for a bot that was started on the corner itself or if a
+        // queued gesture could not be sent. Repeating the already-queued turn
+        // is harmless in Snake Classic; its input buffer treats same-direction
+        // input as the current intent.
+        if (outgoing != incoming) {
+            if (index != lastFallbackCornerIndex && now - lastGestureAt >= 150L) {
+                SnakeAccessibilityService.instance?.swipe(outgoing, bounds)
+                lastGestureAt = now
+                lastFallbackCornerIndex = index
+                setStatus(
+                    "TURN " + outgoing.name + " @ " + tracked.x + "," + tracked.y
+                )
+                return
+            }
+        }
+
+        // Clear old corner markers once we are safely past them.
+        if (lastQueuedCornerIndex >= 0 &&
+            index != lastQueuedCornerIndex &&
+            index != (lastQueuedCornerIndex - 1 + cycle.size) % cycle.size
+        ) {
+            lastQueuedCornerIndex = -1
+        }
+        if (lastFallbackCornerIndex >= 0 && index != lastFallbackCornerIndex) {
+            lastFallbackCornerIndex = -1
+        }
+
         setStatus(
-            "TURN " + desired.name + " @ " + tracked.x + "," + tracked.y
+            "Head " + tracked.x + "," + tracked.y +
+                " | " + incoming.name + " -> " + outgoing.name
         )
     }
 
     private fun setStatus(value: String) {
         lastStatus = value
         SnakeAccessibilityService.instance?.refreshOverlay()
-    }
-
-    private fun cycleDirection(head: Cell, spec: BoardSpec): Direction? {
-        val cycle = HamiltonianCycle.build(spec.columns, spec.rows) ?: return null
-        if (!HamiltonianCycle.isCycleValid(cycle, spec)) return null
-        val index = cycle.indexOf(head)
-        if (index < 0) return null
-        val next = cycle[(index + 1) % cycle.size]
-        return Direction.between(head, next, spec.columns, spec.rows)
     }
 }
