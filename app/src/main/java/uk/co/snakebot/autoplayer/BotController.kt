@@ -9,27 +9,30 @@ object BotController {
     const val SNAKE_PACKAGE = "com.pranta.snakeclassic"
 
     val running = AtomicBoolean(false)
-    private val detector = BoardDetector()
-    private val tracker = GameTracker()
-    private val player = AutoPlayer()
+    private val headDetector = HeadDetector()
 
     @Volatile var lastStatus: String = "Idle"
         private set
-    private var lastMove: Direction? = null
+
+    private var lastHead: Cell? = null
+    private var currentDirection: Direction? = null
     private var lastGestureAt = 0L
+    private var lastGestureDirection: Direction? = null
 
     fun start() {
-        tracker.reset()
-        lastMove = null
+        lastHead = null
+        currentDirection = null
         lastGestureAt = 0L
+        lastGestureDirection = null
         running.set(true)
-        lastStatus = "Armed - auto board"
+        lastStatus = "Auto board | finding head..."
         SnakeAccessibilityService.instance?.refreshOverlay()
     }
 
     fun stop() {
         running.set(false)
-        tracker.reset()
+        lastHead = null
+        currentDirection = null
         lastStatus = "Stopped"
         SnakeAccessibilityService.instance?.refreshOverlay()
     }
@@ -50,38 +53,69 @@ object BotController {
         }
 
         val spec = Prefs.boardSpec(context)
-        val snapshot = detector.detect(source, bounds, spec)
-        if (snapshot == null) {
-            lastStatus = if (Prefs.isAutoPreset(context)) {
-                "Auto board set | looking for snake..."
-            } else {
-                "Looking for snake..."
-            }
+        val head = headDetector.detect(source, bounds, spec)
+        if (head == null) {
+            lastStatus = "Auto board | head not found"
             SnakeAccessibilityService.instance?.refreshOverlay()
             return
         }
 
-        val state = tracker.update(snapshot) ?: run {
-            lastStatus = "Tracking head... start a fresh run"
-            SnakeAccessibilityService.instance?.refreshOverlay()
-            return
+        val previous = lastHead
+        if (previous != null && previous != head) {
+            inferDirection(previous, head)?.let { currentDirection = it }
         }
-        val desired = player.nextDirection(state) ?: run {
-            lastStatus = "No safe move"
+        lastHead = head
+
+        val desired = cycleDirection(head, spec)
+        if (desired == null) {
+            lastStatus = "Head " + head.x + "," + head.y + " | no route"
             SnakeAccessibilityService.instance?.refreshOverlay()
             return
         }
 
-        lastStatus = state.body.size.toString() + " cells | " +
-            state.head.x.toString() + "," + state.head.y.toString() +
-            " | " + desired.name
+        val observed = currentDirection
+        if (observed == null) {
+            lastStatus = "Head " + head.x + "," + head.y + " | learning direction..."
+            SnakeAccessibilityService.instance?.refreshOverlay()
+            return
+        }
+
+        lastStatus = "Head " + head.x + "," + head.y + " | " +
+            observed.name + " -> " + desired.name
         SnakeAccessibilityService.instance?.refreshOverlay()
 
-        if (desired == state.direction || desired == lastMove) return
+        if (desired == observed || desired == observed.opposite) return
+
         val now = SystemClock.elapsedRealtime()
-        if (now - lastGestureAt < 48L) return
-        lastGestureAt = now
-        lastMove = desired
+        if (now - lastGestureAt < 45L) return
+        if (lastGestureDirection == desired && now - lastGestureAt < 140L) return
+
         SnakeAccessibilityService.instance?.swipe(desired, bounds)
+        lastGestureAt = now
+        lastGestureDirection = desired
+
+        // Snake Classic accepts queued turns quickly; treating the dispatched
+        // turn as current immediately prevents duplicate swipes while waiting
+        // for the next visual tick.
+        currentDirection = desired
+    }
+
+    private fun inferDirection(from: Cell, to: Cell): Direction? {
+        return when {
+            to.y == from.y && to.x > from.x -> Direction.RIGHT
+            to.y == from.y && to.x < from.x -> Direction.LEFT
+            to.x == from.x && to.y > from.y -> Direction.DOWN
+            to.x == from.x && to.y < from.y -> Direction.UP
+            else -> null
+        }
+    }
+
+    private fun cycleDirection(head: Cell, spec: BoardSpec): Direction? {
+        val cycle = HamiltonianCycle.build(spec.columns, spec.rows) ?: return null
+        if (!HamiltonianCycle.isCycleValid(cycle, spec)) return null
+        val index = cycle.indexOf(head)
+        if (index < 0) return null
+        val next = cycle[(index + 1) % cycle.size]
+        return Direction.between(head, next, spec.columns, spec.rows)
     }
 }
