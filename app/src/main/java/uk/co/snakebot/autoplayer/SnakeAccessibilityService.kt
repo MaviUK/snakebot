@@ -172,7 +172,7 @@ class SnakeAccessibilityService : AccessibilityService() {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 12
-            y = 110
+            y = 35
         }
         windowManager.addView(root, params)
         overlay = root
