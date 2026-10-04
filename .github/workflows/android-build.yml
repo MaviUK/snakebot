@@ -6,6 +6,7 @@ on:
     branches: ["main"]
     paths:
       - ".payload/**"
+      - "app/**"
       - ".github/workflows/android-build.yml"
 
 permissions:
@@ -28,6 +29,9 @@ jobs:
           mkdir -p build-src
           cat .payload/project.b64.part1 .payload/project.b64.part2 .payload/project.b64.part3 | base64 --decode > project.zip
           unzip -q project.zip -d build-src
+          if [ -d app ]; then
+            cp -a app/. build-src/app/
+          fi
           test -f build-src/settings.gradle.kts
           test -f build-src/app/build.gradle.kts
 
