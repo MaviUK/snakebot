@@ -71,12 +71,7 @@ class SnakeAccessibilityService : AccessibilityService() {
         val cx = (board.left + board.right) / 2f
         val cy = (board.top + board.bottom) / 2f
         val distance = max(80f, minOf(board.width, board.height) * 0.16f)
-        val (ex, ey) = when (direction) {
-            Direction.UP -> cx to (cy - distance)
-            Direction.DOWN -> cx to (cy + distance)
-            Direction.LEFT -> (cx - distance) to cy
-            Direction.RIGHT -> (cx + distance) to cy
-        }
+        val (ex, ey) = step(cx, cy, direction, distance)
         val path = Path().apply {
             moveTo(cx, cy)
             lineTo(ex, ey)
@@ -85,6 +80,51 @@ class SnakeAccessibilityService : AccessibilityService() {
             .addStroke(GestureDescription.StrokeDescription(path, 0, 32))
             .build()
         dispatchGesture(gesture, null, null)
+    }
+
+    /**
+     * Snake Classic has a two-turn input buffer. A single bent gesture sends:
+     *   1) keep going straight on the next tick
+     *   2) turn on the tick after that
+     *
+     * This lets us arm a corner one cell early. It removes the race where the
+     * visual capture sees the edge cell only a few milliseconds before the
+     * next 50-100ms game tick.
+     */
+    fun queueCorner(straight: Direction, turn: Direction, board: PixelRect) {
+        if (turn == straight || turn == straight.opposite) return
+
+        val cx = (board.left + board.right) / 2f
+        val cy = (board.top + board.bottom) / 2f
+        val distance = max(90f, minOf(board.width, board.height) * 0.13f)
+        val (x1, y1) = step(cx, cy, straight, distance)
+        val (x2, y2) = step(x1, y1, turn, distance)
+
+        val path = Path().apply {
+            moveTo(cx, cy)
+            lineTo(x1, y1)
+            lineTo(x2, y2)
+        }
+
+        // 130ms is deliberate. Snake Classic rejects inputs less than 50ms
+        // apart; this duration gives the two legs enough separation while
+        // still completing before the second 50ms tick at maximum speed.
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 130))
+            .build()
+        dispatchGesture(gesture, null, null)
+    }
+
+    private fun step(
+        x: Float,
+        y: Float,
+        direction: Direction,
+        distance: Float
+    ): Pair<Float, Float> = when (direction) {
+        Direction.UP -> x to (y - distance)
+        Direction.DOWN -> x to (y + distance)
+        Direction.LEFT -> (x - distance) to y
+        Direction.RIGHT -> (x + distance) to y
     }
 
     fun refreshOverlay() {
