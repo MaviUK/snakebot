@@ -1,0 +1,65 @@
+name: Build Snake Auto Player APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".payload/**"
+      - ".github/workflows/android-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Restore Android project
+        shell: bash
+        run: |
+          mkdir -p build-src
+          cat .payload/project.b64.part1 .payload/project.b64.part2 .payload/project.b64.part3 | base64 --decode > project.zip
+          unzip -q project.zip -d build-src
+          test -f build-src/settings.gradle.kts
+          test -f build-src/app/build.gradle.kts
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Build debug APK
+        working-directory: build-src
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Prepare APK
+        shell: bash
+        run: cp build-src/app/build/outputs/apk/debug/app-debug.apk snake-auto-player-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: snake-auto-player-debug-apk
+          path: snake-auto-player-debug.apk
+          if-no-files-found: error
+          retention-days: 30
