@@ -46,12 +46,11 @@ class SnakeAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         instance = this
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        showOverlay()
+        showOverlayControls()
     }
 
     override fun onDestroy() {
-        overlay?.let { runCatching { windowManager.removeView(it) } }
-        overlay = null
+        hideOverlayControls()
         instance = null
         super.onDestroy()
     }
@@ -96,8 +95,21 @@ class SnakeAccessibilityService : AccessibilityService() {
     }
 
     fun setOverlayStatus(message: String) {
+        mainHandler.post { statusText?.text = message }
+    }
+
+    fun showOverlayControls() {
         mainHandler.post {
-            statusText?.text = message
+            if (overlay == null) showOverlayInternal()
+        }
+    }
+
+    fun hideOverlayControls() {
+        mainHandler.post {
+            overlay?.let { runCatching { windowManager.removeView(it) } }
+            overlay = null
+            statusText = null
+            toggleButton = null
         }
     }
 
@@ -110,13 +122,18 @@ class SnakeAccessibilityService : AccessibilityService() {
             startActivity(intent)
             return
         }
-        // The board is pre-programmed from the supplied Samsung screenshot.
-        // START can run immediately; CAL remains available as a fallback.
         BotController.start()
     }
 
-    private fun showOverlay() {
+    private fun closeBot() {
+        BotController.stop()
+        CaptureService.instance?.stopSelf()
+        hideOverlayControls()
+    }
+
+    private fun showOverlayInternal() {
         if (overlay != null) return
+
         val bg = GradientDrawable().apply {
             cornerRadius = 18f
             setColor(Color.argb(225, 15, 20, 15))
@@ -130,19 +147,18 @@ class SnakeAccessibilityService : AccessibilityService() {
         statusText = TextView(this).apply {
             setTextColor(Color.WHITE)
             textSize = 11f
-            text = "Idle"
+            text = BotController.lastStatus
         }
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+
         toggleButton = Button(this).apply {
-            text = "START"
+            text = if (BotController.running.get()) "STOP" else "START"
             setOnClickListener {
-                if (BotController.running.get()) {
-                    BotController.stop()
-                } else {
-                    startBotFromOverlay()
-                }
+                if (BotController.running.get()) BotController.stop()
+                else startBotFromOverlay()
             }
         }
+
         val calibrate = Button(this).apply {
             text = "CAL"
             setOnClickListener {
@@ -157,8 +173,15 @@ class SnakeAccessibilityService : AccessibilityService() {
                 }
             }
         }
+
+        val close = Button(this).apply {
+            text = "CLOSE"
+            setOnClickListener { closeBot() }
+        }
+
         row.addView(toggleButton)
         row.addView(calibrate)
+        row.addView(close)
         root.addView(statusText)
         root.addView(row)
 
@@ -171,8 +194,8 @@ class SnakeAccessibilityService : AccessibilityService() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 12
-            y = 35
+            x = 8
+            y = 24
         }
         windowManager.addView(root, params)
         overlay = root
@@ -190,7 +213,9 @@ class SnakeAccessibilityService : AccessibilityService() {
                 }
                 var parent = node.parent
                 while (parent != null) {
-                    if (parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    if (parent.isClickable &&
+                        parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    ) {
                         BotController.start()
                         return
                     }
