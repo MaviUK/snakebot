@@ -154,15 +154,15 @@ class SnakeAccessibilityService : AccessibilityService() {
     }
 
     private fun startBotFromOverlay() {
-        if (CaptureService.instance == null) {
-            setOverlayStatus("Capture OFF - allow screen capture")
-            val intent = Intent(this, CapturePermissionActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                .putExtra(CapturePermissionActivity.EXTRA_AUTO_START, true)
-            startActivity(intent)
-            return
-        }
-        BotController.start()
+        // Always request a fresh projection when START is pressed. On Samsung
+        // an APK update can leave CaptureService.instance non-null even though
+        // Android has stopped delivering frames to the old projection.
+        setOverlayStatus("Starting fresh screen capture...")
+        val intent = Intent(this, CapturePermissionActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra(CapturePermissionActivity.EXTRA_AUTO_START, true)
+            .putExtra(CapturePermissionActivity.EXTRA_FORCE_CAPTURE, true)
+        startActivity(intent)
     }
 
     private fun closeBot() {
