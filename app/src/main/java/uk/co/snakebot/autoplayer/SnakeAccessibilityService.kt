@@ -110,10 +110,8 @@ class SnakeAccessibilityService : AccessibilityService() {
             startActivity(intent)
             return
         }
-        if (Prefs.boardBounds(this) == null) {
-            setOverlayStatus("Tap CAL first")
-            return
-        }
+        // The board is pre-programmed from the supplied Samsung screenshot.
+        // START can run immediately; CAL remains available as a fallback.
         BotController.start()
     }
 
