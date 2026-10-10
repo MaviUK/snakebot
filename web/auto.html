@@ -87,7 +87,7 @@
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">Food first • random timed hazards & bonuses • closing at 85%</div>
+      <div class="tips">Food first • clean row routing • random hazards • closing at 85%</div>
     </section>
   </main>
 
@@ -174,8 +174,8 @@
     const BOMB_LIFETIME_STEPS = 60;
     const BONUS_LIFETIME_STEPS = 110;
     const BONUS_EFFECT_STEPS = 140;
-    const BONUS_MAX_CHASE_STEPS = 12;
-    const BONUS_EXTRA_DETOUR_STEPS = 3;
+    const BONUS_MAX_CHASE_STEPS = 8;
+    const BONUS_EXTRA_DETOUR_STEPS = 2;
     let testSpeedIndex = 0;
 
     function cellKey(x, y){ return x + ',' + y; }
@@ -308,27 +308,34 @@
       }
 
       const activeSet = new Set(active.map(m=>macroKey(m.x,m.y)));
-      const rnd = seededRandom(0x3310 + level * 7919);
-      const start = active[Math.floor(rnd()*active.length)];
+      const start = active[0];
       const visited = new Set([macroKey(start.x,start.y)]);
       const stack = [start];
       const treeEdges = [];
 
       while(stack.length){
         const current = stack[stack.length-1];
-        const options = [
-          {x:current.x+1,y:current.y},
-          {x:current.x-1,y:current.y},
-          {x:current.x,y:current.y+1},
-          {x:current.x,y:current.y-1}
-        ].filter(n =>
+        const preferred =
+          current.y % 2 === 0
+            ? [
+                {x:current.x+1,y:current.y},
+                {x:current.x,y:current.y+1},
+                {x:current.x-1,y:current.y},
+                {x:current.x,y:current.y-1}
+              ]
+            : [
+                {x:current.x-1,y:current.y},
+                {x:current.x,y:current.y+1},
+                {x:current.x+1,y:current.y},
+                {x:current.x,y:current.y-1}
+              ];
+
+        const options = preferred.filter(n =>
           n.x>=0 && n.x<MACRO_W &&
           n.y>=0 && n.y<MACRO_H &&
           activeSet.has(macroKey(n.x,n.y)) &&
           !visited.has(macroKey(n.x,n.y))
         );
-
-        shuffle(options,rnd);
 
         if(!options.length){
           stack.pop();
@@ -646,25 +653,26 @@
     function chooseFoodTarget(){
       if(!foods.length){
         food = null;
-        plannedPath = [];
         return;
       }
 
       if(closingMode){
-        const headIndex = cycleIndex.get(pointKey(snake[0]));
+        const headIndex =
+          cycleIndex.get(pointKey(snake[0]));
 
-        foods.sort((a,b)=>{
-          const ai = cycleIndex.get(pointKey(a));
-          const bi = cycleIndex.get(pointKey(b));
+        const ordered = foods
+          .slice()
+          .sort((a,b)=>{
+            const ai = cycleIndex.get(pointKey(a));
+            const bi = cycleIndex.get(pointKey(b));
 
-          return (
-            forwardDistance(headIndex,ai) -
-            forwardDistance(headIndex,bi)
-          );
-        });
+            return (
+              forwardDistance(headIndex,ai) -
+              forwardDistance(headIndex,bi)
+            );
+          });
 
-        food = foods[0];
-        plannedPath = [];
+        food = ordered[0];
         return;
       }
 
@@ -672,14 +680,6 @@
         food && foods.some(candidate=>same(candidate,food));
 
       if(currentStillExists){
-        if(!plannedPath.length){
-          const currentPath = orderedPathTo(food);
-
-          if(currentPath.length){
-            plannedPath = currentPath.slice();
-          }
-        }
-
         return;
       }
 
@@ -687,27 +687,20 @@
 
       for(const candidate of foods){
         const path = orderedPathTo(candidate);
+
         if(!path.length) continue;
 
-        const distance = path.length;
-
-        if(!best || distance < best.distance){
+        if(!best || path.length < best.distance){
           best = {
             candidate,
-            path,
-            distance
+            distance:path.length
           };
         }
       }
 
-      if(best){
-        food = best.candidate;
-        plannedPath = best.path.slice();
-        return;
-      }
-
-      food = foods[0];
-      plannedPath = [];
+      food = best
+        ? best.candidate
+        : foods[0];
     }
 
     function occupiedHazardCells(){
@@ -1078,7 +1071,6 @@
         });
 
       if(alternatives.length){
-        plannedPath = [];
         return alternatives[0];
       }
 
@@ -1091,9 +1083,24 @@
         const path = orderedPathTo(target);
 
         if(path.length){
-          plannedPath = path.slice(1);
           return path[0];
         }
+      }
+
+      const emergency = gridNeighbors(head)
+        .filter(next=>{
+          const key = pointKey(next);
+
+          return (
+            cycleIndex.has(key) &&
+            !obstacles.has(key) &&
+            !isBombCell(next) &&
+            !bodyBlocked.has(key)
+          );
+        });
+
+      if(emergency.length){
+        return emergency[0];
       }
 
       return {...immediate};
@@ -1113,11 +1120,13 @@
         : [];
 
       const bonusChoice = nearestBonusPath();
+      const bonusLimit =
+        closingMode ? 4 : BONUS_MAX_CHASE_STEPS;
 
       const bonusIsWorthDetour =
         bonusChoice &&
         bonusChoice.path.length > 0 &&
-        bonusChoice.path.length <= BONUS_MAX_CHASE_STEPS &&
+        bonusChoice.path.length <= bonusLimit &&
         (
           !foodPath.length ||
           bonusChoice.path.length <=
@@ -1125,7 +1134,6 @@
         );
 
       if(bonusIsWorthDetour){
-        plannedPath = bonusChoice.path.slice(1);
         return bonusChoice.path[0];
       }
 
@@ -1133,17 +1141,8 @@
         return safeClosingMove();
       }
 
-      if(plannedPath.length){
-        if(isBombCell(plannedPath[0])){
-          plannedPath = [];
-        }else{
-          return plannedPath.shift();
-        }
-      }
-
       if(foodPath.length){
-        plannedPath = foodPath.slice();
-        return plannedPath.shift();
+        return foodPath[0];
       }
 
       const head = snake[0];
