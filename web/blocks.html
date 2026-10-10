@@ -63,7 +63,7 @@ button{font:inherit;color:#eef5ef;user-select:none;cursor:pointer}
     <button type="button" class="dir-key left" id="dirLeft" aria-label="Move left">◀</button>
     <button type="button" class="dir-key center" id="menuBtn" aria-label="Pause and open menu">MENU</button>
     <button type="button" class="dir-key right" id="dirRight" aria-label="Move right">▶</button>
-    <button type="button" class="dir-key down" id="dirDown" aria-label="Move down">▼</button>
+    <button type="button" class="dir-key down" id="dirDown" aria-label="Drop block instantly">▼</button>
   </div></div>
 </section>
 </main>
@@ -91,7 +91,8 @@ function rotate(cells){return normalise(cells.map(([x,y])=>[3-y,x]));}
 const ROT={};for(const t of TYPES){const found=[],seen=new Set();let cur=normalise(SHAPES[t]);for(let i=0;i<4;i++){const key=JSON.stringify(cur);if(!seen.has(key)){seen.add(key);found.push({cells:cur,w:Math.max(...cur.map(c=>c[0]))+1,h:Math.max(...cur.map(c=>c[1]))+1});}cur=rotate(cur);}ROT[t]=found;}
 const SAVE='retroBlocks3310SaveV1',BEST='retroBlocks3310BestV1',SOUND='retroBlocks3310SoundV1';
 let board=[],bag=[],queue=[],active=null,plan=null,level=1,score=0,lines=0,best={score:0,level:1,lines:0};
-let auto=true,soundOn=false,running=true,gameOver=false,menuOpen=false,menuView='main',tickCount=0,clearFlash=0,clearText='',highlightTimeout=null,repeatTimer=null,audio=null,gravityCounter=0,closingTimer=null;
+let auto=true,soundOn=false,running=true,gameOver=false,menuOpen=false,menuView='main',tickCount=0,clearFlash=0,clearText='',highlightTimeout=null,repeatTimer=null,audio=null,gravityCounter=0,closingTimer=null,placedPieces=0,autoElapsedMs=0;
+const FRAME_MS=40;
 function emptyBoard(){return Array.from({length:R},()=>Array(C).fill(null));}
 function numeric(n){return Math.max(0,Math.floor(n||0));}
 function safeRead(key){try{return JSON.parse(localStorage.getItem(key)||'null');}catch{return null;}}
@@ -122,12 +123,12 @@ function choosePlan(){if(!active)return null;const next=queue[0];const first=all
   }
   return winner;
 }
-function spawn(){replenish();const type=queue.shift();replenish();const shape=ROT[type][0];active={type,rot:0,x:Math.floor((C-shape.w)/2),y:-shape.h};gravityCounter=0;plan=null;
+function spawn(){replenish();const type=queue.shift();replenish();const shape=ROT[type][0];active={type,rot:0,x:Math.floor((C-shape.w)/2),y:-shape.h};gravityCounter=0;autoElapsedMs=0;plan=null;
   if(collides(board,shape,active.x,active.y+1)){endGame();return;}
   if(auto)plan=choosePlan();
   saveProgress();
 }
-function newGame(){if(closingTimer){clearTimeout(closingTimer);closingTimer=null;}board=emptyBoard();bag=[];queue=[];active=null;plan=null;level=1;score=0;lines=0;tickCount=0;clearFlash=0;gameOver=false;running=true;menuOpen=false;gravityCounter=0;auto=auto===false?false:true;overlay.classList.add('hidden');menu.classList.add('hidden');spawn();updateHud();render();saveProgress();}
+function newGame(){if(closingTimer){clearTimeout(closingTimer);closingTimer=null;}board=emptyBoard();bag=[];queue=[];active=null;plan=null;level=1;score=0;lines=0;tickCount=0;placedPieces=0;autoElapsedMs=0;clearFlash=0;gameOver=false;running=true;menuOpen=false;gravityCounter=0;auto=auto===false?false:true;overlay.classList.add('hidden');menu.classList.add('hidden');spawn();updateHud();render();saveProgress();}
 function endGame(){gameOver=true;running=false;active=null;plan=null;updateBest();saveProgress();showOverlay('GAME OVER',`LEVEL ${level}<br>POINTS ${score.toLocaleString()}<br>${auto?'RESTARTING...':'PRESS MENU TO RESTART'}`);beep(210,0.22);
   if(auto)closingTimer=setTimeout(()=>{closingTimer=null;if(gameOver&&!menuOpen&&auto)newGame();},2700);
 }
@@ -140,22 +141,24 @@ function rotateActive(){if(!active||ROT[active.type].length===1)return false;
 }
 function lockPiece(){if(!active)return;const s=shapeOf(active);let above=false;for(const [cx,cy] of s.cells){const y=active.y+cy;if(y<0){above=true;continue;}board[y][active.x+cx]=active.type;}
   if(above){endGame();return;}
+  placedPieces++;
   let removed=0;for(let y=R-1;y>=0;y--){if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(C).fill(null));removed++;y++;}}
   if(removed){lines+=removed;score+=([0,100,300,500,800][removed]||800)*level;level=1+Math.floor(lines/10);clearFlash=removed===4?8:5;clearText=removed===4?'4 LINES!':removed===3?'TRIPLE!':removed===2?'DOUBLE!':'LINE CLEAR!';beep(removed===4?800:540,0.1);
   }else{score+=5;}
   updateBest();spawn();updateHud();
 }
-function levelTickRate(){return Math.max(1,Math.round(12*Math.pow(0.86,level-1)));}
+function autoDropMs(){return Math.max(40,Math.round(160*Math.pow(0.93,level-1)*Math.pow(0.992,placedPieces)));}
+function levelTickRate(){return Math.max(2,Math.round(780*Math.pow(0.86,level-1)/FRAME_MS));}
 function manualTick(){gravityCounter++;if(gravityCounter>=levelTickRate()){gravityCounter=0;if(!move(0,1))lockPiece();}}
 function glowDirection(dir){if(!buttons[dir])return;for(const b of Object.values(buttons))b.classList.remove('pressed');buttons[dir].classList.add('pressed');clearTimeout(highlightTimeout);highlightTimeout=setTimeout(()=>buttons[dir].classList.remove('pressed'),100);}
 function autoTick(){if(!active)return;if(!plan){plan=choosePlan();if(!plan){endGame();return;}}
   const count=ROT[active.type].length;
   if(active.rot!==plan.rot){if(count>1&&rotateActive()){glowDirection('up');return;}}
   if(active.x!==plan.x){const sign=Math.sign(plan.x-active.x);if(move(sign,0)){glowDirection(sign<0?'left':'right');return;}}
-  glowDirection('down');const cells=Math.min(7,1+Math.floor((level-1)/4));for(let n=0;n<cells;n++){if(!move(0,1)){lockPiece();break;}}
+  glowDirection('down');if(!move(0,1))lockPiece();
 }
 function tick(){if(!running||menuOpen||gameOver)return;tickCount++;if(clearFlash>0){clearFlash--;screen.classList.toggle('effect-tetris',clearText==='4 LINES!'&&clearFlash%2===0);screen.classList.toggle('effect-clear',clearText!=='4 LINES!'&&clearFlash%2===0);if(!clearFlash){screen.classList.remove('effect-clear','effect-tetris');clearText='';}}
-  if(auto){if(tickCount%2===0)autoTick();}else manualTick();
+  if(auto){autoElapsedMs+=FRAME_MS;const delay=autoDropMs();if(autoElapsedMs>=delay){autoElapsedMs-=delay;autoTick();}}else manualTick();
   updateHud();render();
 }
 function updateHud(){$('screenLevel').textContent='LEVEL '+String(level).padStart(2,'0');$('screenPoints').textContent='POINTS '+String(score).padStart(6,'0');effect.textContent=clearFlash?clearText:(auto?'AUTO PLAY':'MANUAL')+'  |  LINES '+String(lines).padStart(2,'0');}
@@ -173,13 +176,26 @@ function render(){ctx.fillStyle=LCD;ctx.fillRect(0,0,W,H);
   ctx.fillStyle=INK;ctx.font='bold 15px monospace';ctx.textAlign='left';ctx.fillText('NEXT',176,22);
   for(let n=0;n<3;n++){const type=queue[n];if(!type)continue;const sh=ROT[type][0];const mini=12,shiftX=178+Math.round((88-sh.w*mini)/2),shiftY=33+n*58;for(const [cx,cy] of sh.cells)drawBlock(shiftX+cx*mini,shiftY+cy*mini,mini);if(n<2){ctx.globalAlpha=.22;ctx.fillRect(175,83+n*58,100,1);ctx.globalAlpha=1;}}
   ctx.fillStyle=INK;ctx.font='bold 13px monospace';ctx.fillText('LINES',176,216);ctx.font='bold 19px monospace';ctx.fillText(String(lines).padStart(3,'0'),176,236);
-  ctx.font='bold 11px monospace';ctx.fillText(auto?'AI: ON':'AI: OFF',176,261);ctx.fillText('SPEED '+String(level).padStart(2,'0'),176,276);
+  ctx.font='bold 11px monospace';ctx.fillText(auto?'AI: ON':'AI: OFF',176,261);ctx.fillText(auto?'DROP '+autoDropMs()+'ms':'SPEED '+String(level).padStart(2,'0'),176,276);
 }
 function showOverlay(title,sub){overlay.innerHTML=`<div><div class="big">${title}</div><div class="small">${sub}</div></div>`;overlay.classList.remove('hidden');}
 function beep(freq=440,duration=.08){if(!soundOn)return;try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();const osc=audio.createOscillator(),gain=audio.createGain();osc.type='square';osc.frequency.value=freq;gain.gain.setValueAtTime(.035,audio.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);osc.connect(gain).connect(audio.destination);osc.start();osc.stop(audio.currentTime+duration);}catch{}}
 function hardDrop(){if(!active||!running||gameOver||menuOpen)return;let distance=0;while(move(0,1))distance++;score+=distance*2;glowDirection('down');lockPiece();updateHud();render();}
-function manualAction(key){if(auto||menuOpen||!running||gameOver||!active)return;let changed=false;
-  if(key==='up')changed=rotateActive();else if(key==='left')changed=move(-1,0);else if(key==='right')changed=move(1,0);else if(key==='down'){if(move(0,1)){score++;changed=true;}else{lockPiece();changed=true;}}
+function pressDrop(){
+  if(!active||!running||gameOver||menuOpen)return;
+  if(!auto){hardDrop();return;}
+  if(!plan)plan=choosePlan();
+  if(!plan){endGame();return;}
+  const target=simulate(board,ROT[active.type][plan.rot],plan.x);
+  if(!target){endGame();return;}
+  score+=Math.max(0,target.y-active.y)*2;
+  active.x=plan.x;active.rot=plan.rot;active.y=target.y;
+  glowDirection('down');lockPiece();updateHud();render();
+}
+function manualAction(key){if(auto||menuOpen||!running||gameOver||!active)return;
+  if(key==='down'){pressDrop();return;}
+  let changed=false;
+  if(key==='up')changed=rotateActive();else if(key==='left')changed=move(-1,0);else if(key==='right')changed=move(1,0);
   if(changed){glowDirection(key);beep(380,.025);updateHud();render();}
 }
 const names=['PIXEL PETE','RETRO RAY','BITMASTER','GAME GIRL','DOT MATRIX','LEVEL LORD','8BIT ACE','OLD SCHOOL','GRID KING','NOKIA NED','BUTTON BAS','BLOCK BOSS','ARCADE AL','MRS PIXEL','BRICK FIX','LCD LEGEND','LINE CHASER','MONO MAN','SPEEDY K','TETRO TOM'];
@@ -211,29 +227,29 @@ menu.addEventListener('click',e=>{const item=e.target.closest('[data-action]');i
   if(action==='save'){saveProgress();flashMenu('PROGRESS SAVED');return;}
   if(action==='load'){if(loadProgress(true)){renderMenu();flashMenu('PROGRESS LOADED');}else flashMenu('NO SAVE FOUND');return;}
 });
-function saveProgress(){if(!active||gameOver)return;put(SAVE,{v:1,board,bag,queue,active,level,score,lines,auto,soundOn,savedAt:Date.now()});}
+function saveProgress(){if(!active||gameOver)return;put(SAVE,{v:1,board,bag,queue,active,level,score,lines,placedPieces,auto,soundOn,savedAt:Date.now()});}
 function loadProgress(keepMenu=false){const s=safeRead(SAVE);if(!s||s.v!==1||!Array.isArray(s.board)||s.board.length!==R||s.board.some(row=>!Array.isArray(row)||row.length!==C)||!s.active||!ROT[s.active.type]||!Array.isArray(s.queue))return false;
   board=s.board.map(row=>row.map(v=>TYPES.includes(v)?v:null));bag=(s.bag||[]).filter(t=>TYPES.includes(t));queue=s.queue.filter(t=>TYPES.includes(t));active={type:s.active.type,rot:numeric(s.active.rot)%ROT[s.active.type].length,x:Number(s.active.x)||0,y:Number(s.active.y)||0};
   if(!Number.isInteger(active.x)||!Number.isInteger(active.y)||collides(board,shapeOf(active),active.x,active.y))return false;
-  level=Math.max(1,Math.min(999,numeric(s.level)));score=numeric(s.score);lines=numeric(s.lines);auto=s.auto!==false;soundOn=!!s.soundOn;put(SOUND,soundOn);replenish();gameOver=false;running=true;clearFlash=0;overlay.classList.add('hidden');if(!keepMenu){menuOpen=false;menu.classList.add('hidden');}plan=auto?choosePlan():null;updateHud();render();return true;
+  level=Math.max(1,Math.min(999,numeric(s.level)));score=numeric(s.score);lines=numeric(s.lines);placedPieces=Number.isFinite(s.placedPieces)?numeric(s.placedPieces):numeric(s.lines)*2;autoElapsedMs=0;gravityCounter=0;auto=s.auto!==false;soundOn=!!s.soundOn;put(SOUND,soundOn);replenish();gameOver=false;running=true;clearFlash=0;overlay.classList.add('hidden');if(!keepMenu){menuOpen=false;menu.classList.add('hidden');}plan=auto?choosePlan():null;updateHud();render();return true;
 }
 $('menuBtn').addEventListener('click',openMenu);
 for(const [key,btn] of Object.entries(buttons)){
-  btn.addEventListener('pointerdown',e=>{e.preventDefault();if(auto||menuOpen)return;manualAction(key);if(key==='left'||key==='right'||key==='down'){clearInterval(repeatTimer);repeatTimer=setInterval(()=>manualAction(key),110);}try{btn.setPointerCapture(e.pointerId);}catch{}});
+  btn.addEventListener('pointerdown',e=>{e.preventDefault();if(menuOpen)return;if(key==='down'){pressDrop();return;}if(auto)return;manualAction(key);if(key==='left'||key==='right'){clearInterval(repeatTimer);repeatTimer=setInterval(()=>manualAction(key),110);}try{btn.setPointerCapture(e.pointerId);}catch{}});
   const end=()=>{clearInterval(repeatTimer);repeatTimer=null;};btn.addEventListener('pointerup',end);btn.addEventListener('pointercancel',end);btn.addEventListener('lostpointercapture',end);
 }
 window.addEventListener('keydown',e=>{const map={ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right'};
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Enter'].includes(e.code))e.preventDefault();
   if(e.code==='Escape'||e.code==='Enter'){openMenu();return;}
-  if((e.code==='Space'||e.code==='KeyX')&&!auto){hardDrop();return;}
+  if(['ArrowDown','KeyS','Space','KeyX'].includes(e.code)){if(!e.repeat)pressDrop();return;}
   if(map[e.code]&&!auto)manualAction(map[e.code]);
 });
-let touchStart=null;const area=$('boardArea');area.addEventListener('pointerdown',e=>{touchStart={x:e.clientX,y:e.clientY};});area.addEventListener('pointerup',e=>{if(!touchStart||auto||menuOpen)return;const dx=e.clientX-touchStart.x,dy=e.clientY-touchStart.y;touchStart=null;if(Math.abs(dx)<18&&Math.abs(dy)<18){manualAction('up');return;}if(Math.abs(dx)>Math.abs(dy)){for(let n=0;n<Math.min(4,Math.round(Math.abs(dx)/35));n++)manualAction(dx>0?'right':'left');}else if(dy>35)hardDrop();else if(dy< -25)manualAction('up');});
+let touchStart=null;const area=$('boardArea');area.addEventListener('pointerdown',e=>{touchStart={x:e.clientX,y:e.clientY};});area.addEventListener('pointerup',e=>{if(!touchStart||menuOpen)return;const dx=e.clientX-touchStart.x,dy=e.clientY-touchStart.y;touchStart=null;if(auto){if(dy>35&&Math.abs(dy)>Math.abs(dx))pressDrop();return;}if(Math.abs(dx)<18&&Math.abs(dy)<18){manualAction('up');return;}if(Math.abs(dx)>Math.abs(dy)){for(let n=0;n<Math.min(4,Math.round(Math.abs(dx)/35));n++)manualAction(dx>0?'right':'left');}else if(dy>35)pressDrop();else if(dy< -25)manualAction('up');});
 function persistIfLive(){if(active&&!gameOver)saveProgress();}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)persistIfLive();});window.addEventListener('pagehide',persistIfLive);
 try{const b=safeRead(BEST);if(b&&typeof b.score==='number')best=b;const snd=safeRead(SOUND);if(typeof snd==='boolean')soundOn=snd;}catch{}
-if(!loadProgress(false))newGame();updateHud();render();setInterval(tick,65);
-window.retroBlocksTest={getState:()=>({board:board.map(r=>r.slice()),active:active&&{...active},plan,queue:[...queue],score,level,lines,auto,menuOpen,running,gameOver}),step:n=>{for(let i=0;i<(n||1);i++)tick();},newGame,setManual:()=>{auto=false;plan=null;},hardDrop,saveProgress,loadProgress};
+if(!loadProgress(false))newGame();updateHud();render();setInterval(tick,FRAME_MS);
+window.retroBlocksTest={getState:()=>({board:board.map(r=>r.slice()),active:active&&{...active},plan,queue:[...queue],score,level,lines,placedPieces,autoDropMs:autoDropMs(),auto,menuOpen,running,gameOver}),step:n=>{for(let i=0;i<(n||1);i++)tick();},newGame,setManual:()=>{auto=false;plan=null;},hardDrop,pressDrop,saveProgress,loadProgress};
 })();
 </script>
 </body>
