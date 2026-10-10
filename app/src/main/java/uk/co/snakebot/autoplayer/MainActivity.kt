@@ -1,176 +1,214 @@
 package uk.co.snakebot.autoplayer
 
-import android.Manifest
-import android.app.Activity
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.media.projection.MediaProjectionManager
-import android.os.Build
+import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Bundle
-import android.provider.Settings
-import android.widget.*
-import androidx.activity.result.contract.ActivityResultContracts
+import android.view.Gravity
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import android.view.WindowManager
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
-import uk.co.snakebot.autoplayer.core.BoardSpec
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var status: TextView
-    private lateinit var boardSpinner: Spinner
 
-    private val captureLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            val service = Intent(this, CaptureService::class.java)
-                .putExtra(CaptureService.EXTRA_RESULT_CODE, result.resultCode)
-                .putExtra(CaptureService.EXTRA_DATA, result.data)
-            ContextCompat.startForegroundService(this, service)
-            Toast.makeText(this, "Screen capture started", Toast.LENGTH_SHORT).show()
-        }
-        refreshStatus()
+    companion object {
+        private const val GAME_URL =
+            "https://nokia-snake-3310.netlify.app/auto.html"
     }
 
+    private lateinit var root: FrameLayout
+    private lateinit var webView: WebView
+    private lateinit var offlineView: LinearLayout
+    private var pageLoaded = false
+
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(buildUi())
-        if (Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
+
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.statusBarColor = Color.BLACK
+        window.navigationBarColor = Color.BLACK
+
+        root = FrameLayout(this).apply {
+            setBackgroundColor(Color.rgb(16, 22, 21))
+        }
+
+        webView = WebView(this).apply {
+            setBackgroundColor(Color.rgb(16, 22, 21))
+
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                cacheMode = WebSettings.LOAD_DEFAULT
+                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                mediaPlaybackRequiresUserGesture = false
+                builtInZoomControls = false
+                displayZoomControls = false
+                setSupportZoom(false)
+            }
+
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    pageLoaded = true
+                    showGame()
+                }
+
+                override fun onReceivedError(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                    error: WebResourceError?
+                ) {
+                    if (request?.isForMainFrame == true) {
+                        pageLoaded = false
+                        showOffline()
+                    }
+                }
+            }
+        }
+
+        offlineView = buildOfflineView()
+
+        root.addView(
+            webView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        root.addView(
+            offlineView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        setContentView(root)
+        enterImmersiveMode()
+
+        if (savedInstanceState == null) {
+            webView.loadUrl(GAME_URL)
+        } else {
+            webView.restoreState(savedInstanceState)
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        refreshStatus()
-    }
-
-    private fun buildUi(): LinearLayout {
-        val root = LinearLayout(this).apply {
+    private fun buildOfflineView(): LinearLayout {
+        return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(28, 40, 28, 28)
-        }
+            gravity = Gravity.CENTER
+            setPadding(48, 48, 48, 48)
+            setBackgroundColor(Color.rgb(16, 22, 21))
+            visibility = View.GONE
 
-        fun addTitle(text: String, size: Float) {
-            root.addView(TextView(this).apply {
-                this.text = text
-                textSize = size
+            addView(TextView(this@MainActivity).apply {
+                text = "SNAKE"
+                textSize = 28f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+            })
+
+            addView(TextView(this@MainActivity).apply {
+                text = "No connection.\nReconnect and try again."
+                textSize = 16f
+                setTextColor(Color.LTGRAY)
+                gravity = Gravity.CENTER
+                setPadding(0, 22, 0, 22)
+            })
+
+            addView(Button(this@MainActivity).apply {
+                text = "RETRY"
+                setOnClickListener {
+                    visibility = View.GONE
+                    webView.visibility = View.VISIBLE
+                    webView.loadUrl(GAME_URL)
+                }
             })
         }
-
-        addTitle("Snake Auto Player", 28f)
-        addTitle(
-            "Galaxy preset: Classic 20 x 20. Start a fresh run, then press START in the floating controls.",
-            15f
-        )
-
-        status = TextView(this).apply { textSize = 14f }
-        root.addView(status)
-
-        root.addView(Button(this).apply {
-            text = "Enable accessibility control"
-            setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-        })
-
-        root.addView(Button(this).apply {
-            text = "Start screen capture"
-            setOnClickListener {
-                val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                captureLauncher.launch(manager.createScreenCaptureIntent())
-            }
-        })
-
-        root.addView(Button(this).apply {
-            text = "Show floating controls"
-            setOnClickListener {
-                val service = SnakeAccessibilityService.instance
-                if (service != null) {
-                    service.showOverlayControls()
-                    Toast.makeText(this@MainActivity, "Controls shown", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Enable Snake Auto Player in Accessibility first",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-        })
-
-        root.addView(TextView(this).apply { text = "Board size"; textSize = 15f })
-        val labels = arrayOf(
-            "15 x 15", "20 x 20", "25 x 25", "30 x 30", "35 x 35",
-            "40 x 40", "18 x 32 Tall", "24 x 42 Tall Plus", "50 x 50"
-        )
-        val specs = arrayOf(
-            BoardSpec(15,15), BoardSpec(20,20), BoardSpec(25,25), BoardSpec(30,30),
-            BoardSpec(35,35), BoardSpec(40,40), BoardSpec(18,32), BoardSpec(24,42), BoardSpec(50,50)
-        )
-
-        boardSpinner = Spinner(this).apply {
-            adapter = ArrayAdapter(
-                this@MainActivity,
-                android.R.layout.simple_spinner_dropdown_item,
-                labels
-            )
-            val current = Prefs.boardSpec(this@MainActivity)
-            setSelection(specs.indexOfFirst { it == current }.coerceAtLeast(1))
-            onItemSelectedListener =
-                object : android.widget.AdapterView.OnItemSelectedListener {
-                    override fun onItemSelected(
-                        parent: android.widget.AdapterView<*>?,
-                        view: android.view.View?,
-                        position: Int,
-                        id: Long
-                    ) {
-                        Prefs.setBoardSpec(this@MainActivity, specs[position])
-                    }
-                    override fun onNothingSelected(
-                        parent: android.widget.AdapterView<*>?
-                    ) = Unit
-                }
-        }
-        root.addView(boardSpinner)
-
-        val autoRestart = CheckBox(this).apply {
-            text = "Auto-restart after a crash"
-            isChecked = Prefs.autoRestart(this@MainActivity)
-            setOnCheckedChangeListener { _, checked ->
-                Prefs.setAutoRestart(this@MainActivity, checked)
-            }
-        }
-        root.addView(autoRestart)
-
-        root.addView(Button(this).apply {
-            text = "Open Snake Classic"
-            setOnClickListener {
-                val launch = packageManager.getLaunchIntentForPackage(BotController.SNAKE_PACKAGE)
-                if (launch != null) startActivity(launch)
-                else Toast.makeText(
-                    this@MainActivity,
-                    "Snake Classic is not installed",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        })
-
-        root.addView(Button(this).apply {
-            text = "Stop capture & hide controls"
-            setOnClickListener {
-                BotController.stop()
-                CaptureService.instance?.stopSelf()
-                SnakeAccessibilityService.instance?.hideOverlayControls()
-                refreshStatus()
-            }
-        })
-
-        return root
     }
 
-    private fun refreshStatus() {
-        val access = if (SnakeAccessibilityService.isEnabled(this)) "ON" else "OFF"
-        val capture = if (CaptureService.instance != null) "ON" else "OFF"
-        status.text = "Accessibility: " + access + "   |   Capture: " + capture
+    private fun showGame() {
+        webView.visibility = View.VISIBLE
+        offlineView.visibility = View.GONE
+    }
+
+    private fun showOffline() {
+        webView.visibility = View.GONE
+        offlineView.visibility = View.VISIBLE
+    }
+
+    private fun toggleGameMenu() {
+        if (!pageLoaded) {
+            finish()
+            return
+        }
+
+        webView.evaluateJavascript(
+            """
+            (() => {
+              const menu = document.getElementById('lcdMenu');
+              const button = document.getElementById('menuBtn');
+              if (!menu || !button) return false;
+              button.click();
+              return true;
+            })();
+            """.trimIndent(),
+            null
+        )
+    }
+
+    private fun enterImmersiveMode() {
+        window.decorView.systemUiVisibility =
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+            View.SYSTEM_UI_FLAG_FULLSCREEN or
+            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+
+        window.insetsController?.apply {
+            hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+            systemBarsBehavior =
+                WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            enterImmersiveMode()
+        }
+    }
+
+    @Deprecated("Handled as an in-game menu button")
+    override fun onBackPressed() {
+        toggleGameMenu()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        webView.saveState(outState)
+        super.onSaveInstanceState(outState)
+    }
+
+    override fun onDestroy() {
+        webView.stopLoading()
+        webView.webViewClient = WebViewClient()
+        webView.destroy()
+        super.onDestroy()
     }
 }
