@@ -7,7 +7,8 @@
   <title>Snake 3310 Auto</title>
   <style>
     :root{
-      --phone:#355d54;--phone-dark:#183b35;--phone-light:#6b8f86;--screen:#9cad6c;--pixel:#24351f;--screen-edge:#172d29;
+      --phone:#355d54;--phone-dark:#183b35;--phone-light:#6b8f86;
+      --screen:#9cad6c;--pixel:#24351f;--screen-edge:#172d29;
     }
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     html,body{margin:0;min-height:100%;background:#101615;font-family:Arial,Helvetica,sans-serif;color:white;overscroll-behavior:none}
@@ -17,21 +18,20 @@
     .brand{display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:12px;color:#e8f0e8;font-weight:800;letter-spacing:.19em;font-size:13px;text-shadow:0 1px #000}
     .speaker{width:38px;height:5px;border-radius:999px;background:#122e29;box-shadow:inset 0 1px 1px #0008}
     .screen-shell{background:var(--screen-edge);padding:12px;border-radius:14px 14px 28px 28px;box-shadow:inset 0 0 12px #000b,0 2px 1px #9bb7af44}
-    .screen{position:relative;aspect-ratio:1/1.03;overflow:hidden;background:var(--screen);border:3px solid #566846;box-shadow:inset 0 0 22px #4f603c55;image-rendering:pixelated}
+    .screen{position:relative;aspect-ratio:1/1;overflow:hidden;background:var(--screen);border:3px solid #566846;box-shadow:inset 0 0 22px #4f603c55;image-rendering:pixelated}
     canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
     .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#9cad6cee;color:var(--pixel);font-family:monospace;font-weight:900;text-align:center;padding:20px;z-index:2}
     .overlay.hidden{display:none}
     .overlay .big{font-size:22px;letter-spacing:.05em;margin-bottom:8px}
     .overlay .small{font-size:12px;line-height:1.45}
-    .hud{display:flex;justify-content:space-between;margin:8px 2px 0;font-family:monospace;font-weight:900;color:#dce7dc;font-size:12px;text-shadow:0 1px #000}
+    .hud{display:flex;justify-content:space-between;margin:8px 2px 0;font-family:monospace;font-weight:900;color:#dce7dc;font-size:12px;text-shadow:0 1px #000;gap:8px}
     .status{text-align:center;min-height:18px;margin-top:5px;font-family:monospace;font-size:12px;color:#dce7dc;font-weight:800}
     .progress{height:6px;margin:7px 3px 0;border-radius:10px;background:#183b35;overflow:hidden;box-shadow:inset 0 1px 2px #0008}
-    .progress > div{height:100%;width:0;background:#cbd8c9;transition:width .08s linear}
-    .controls{padding-top:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:center}
+    .progress>div{height:100%;width:0;background:#cbd8c9;transition:width .08s linear}
+    .controls{padding-top:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     button{font:inherit;color:#eef5ef;user-select:none;touch-action:manipulation}
     .soft{height:44px;border-radius:18px 18px 28px 28px;border:1px solid #79968f66;background:linear-gradient(#52756d,#2a4943);box-shadow:inset 0 2px 2px #ffffff22,0 3px 4px #0007;font-weight:800;font-size:11px;letter-spacing:.04em}
     .soft:active{transform:translateY(2px);box-shadow:inset 0 2px 5px #0008}
-    .auto-key{grid-column:1/4;justify-self:center;width:116px;height:56px;border-radius:50%;border:1px solid #79968f66;background:linear-gradient(#78968f,#35564f);box-shadow:inset 0 2px 2px #fff2,0 4px 6px #0007;font-size:12px;font-weight:900}
     .tips{margin:14px 6px 0;text-align:center;color:#bac9c4;font-size:12px;line-height:1.45}
     @media (max-height:760px){body{align-items:flex-start}.phone{padding-top:18px;padding-bottom:22px}.controls{padding-top:13px}.tips{display:none}}
   </style>
@@ -41,19 +41,25 @@
     <section class="phone" aria-label="Nokia-style automatic Snake game">
       <div class="brand"><span class="speaker"></span><span>SNAKE AUTO 3310</span><span class="speaker"></span></div>
       <div class="screen-shell"><div class="screen">
-        <canvas id="game" width="240" height="248" aria-label="Automatic Snake game"></canvas>
+        <canvas id="game" width="240" height="240" aria-label="Automatic Snake game"></canvas>
         <div id="overlay" class="overlay hidden"><div><div class="big">LEVEL 1</div><div class="small">AUTO PLAY</div></div></div>
       </div></div>
-      <div class="hud"><span id="leftHud">LEVEL 01</span><span id="rightHud">LEN 005/930</span></div>
-      <div id="status" class="status">AUTO CHASE</div>
+
+      <div class="hud">
+        <span id="leftHud">LEVEL 01</span>
+        <span id="rightHud">LEN 005/900</span>
+      </div>
+
+      <div id="status" class="status">AUTO HUNT</div>
       <div class="progress"><div id="progressBar"></div></div>
+
       <div class="controls">
         <button id="pauseBtn" class="soft">PAUSE</button>
-        <button id="speedBtn" class="soft">SPEED ×8</button>
         <button id="soundBtn" class="soft">SOUND OFF</button>
-        <button id="restartBtn" class="auto-key">RESTART LEVEL</button>
+        <button id="restartBtn" class="soft">RESTART</button>
       </div>
-      <div class="tips">AI chases food • packs safely • fills every cell • next level starts automatically</div>
+
+      <div class="tips">Random food • safe shortcuts • obstacle levels • automatic next level</div>
     </section>
   </main>
 
@@ -69,89 +75,394 @@
     const statusEl = document.getElementById('status');
     const progressBar = document.getElementById('progressBar');
     const pauseBtn = document.getElementById('pauseBtn');
-    const speedBtn = document.getElementById('speedBtn');
     const soundBtn = document.getElementById('soundBtn');
     const restartBtn = document.getElementById('restartBtn');
 
     const COLS = 30;
-    const ROWS = 31;
+    const ROWS = 30;
     const CELL = 8;
     const W = COLS * CELL;
     const H = ROWS * CELL;
-    const TOTAL = COLS * ROWS;
-    const CHASE_TARGET = Math.floor(TOTAL * 0.12);
+    const MACRO_W = COLS / 2;
+    const MACRO_H = ROWS / 2;
+
     const LCD = '#9cad6c';
     const PIXEL = '#24351f';
     const GRID = 'rgba(36,53,31,.055)';
-    const SPEEDS = [2, 4, 8, 16];
 
     canvas.width = W;
     canvas.height = H;
 
-    let cycle = [];
-    let cycleIndex = new Map();
+    const OBSTACLE_GROUPS = [
+      [[7,7]],
+      [[3,4]],
+      [[10,10],[11,10]],
+      [[11,3],[11,4]],
+      [[4,11],[5,11]],
+      [[6,3],[7,3],[8,3]],
+      [[2,8],[2,9]],
+      [[9,12],[10,12]],
+      [[12,6],[12,7],[12,8]],
+      [[5,6],[5,7]],
+      [[8,4],[9,4]],
+      [[3,12],[4,12],[5,12]]
+    ];
+
+    let level = 1;
     let snake = [];
     let food = null;
-    let chasePath = [];
-    let phase = 'CHASE';
-    let packingMoves = 0;
-    let level = 1;
-    let levelFood = 0;
-    let totalFood = 0;
+    let obstacles = new Set();
+    let cycle = [];
+    let cycleIndex = new Map();
     let running = true;
     let transitioning = false;
-    let speedIndex = 2;
+    let timer = null;
     let soundOn = false;
     let audioCtx = null;
-    let raf = 0;
+    let foodCount = 0;
 
-    function key(p){ return p.x + ',' + p.y; }
-    function same(a,b){ return !!a && !!b && a.x === b.x && a.y === b.y; }
-    function forwardDistance(a,b){ return (b - a + TOTAL) % TOTAL; }
+    function cellKey(x, y){ return x + ',' + y; }
+    function pointKey(p){ return cellKey(p.x, p.y); }
+    function macroKey(x, y){ return x + ':' + y; }
 
-    function buildHamiltonianCycle(){
-      const out = [];
-      for(let y=0;y<ROWS;y++) out.push({x:0,y:y});
+    function parseCellKey(k){
+      const parts = k.split(',');
+      return {x:Number(parts[0]), y:Number(parts[1])};
+    }
 
-      for(let x=1;x<COLS;x++){
-        if(x % 2 === 1){
-          for(let y=ROWS-1;y>=1;y--) out.push({x:x,y:y});
-        }else{
-          for(let y=1;y<ROWS;y++) out.push({x:x,y:y});
+    function seededRandom(seed){
+      let s = seed >>> 0;
+      return () => {
+        s ^= s << 13;
+        s ^= s >>> 17;
+        s ^= s << 5;
+        return ((s >>> 0) / 4294967296);
+      };
+    }
+
+    function shuffle(arr, rnd){
+      for(let i=arr.length-1;i>0;i--){
+        const j = Math.floor(rnd() * (i+1));
+        [arr[i],arr[j]]=[arr[j],arr[i]];
+      }
+      return arr;
+    }
+
+    function levelDelay(){
+      return Math.max(72, Math.round(122 - (level - 1) * 1.5));
+    }
+
+    function obstacleMacrosForLevel(){
+      const blocked = new Set();
+      if(level < 4) return blocked;
+
+      const stages = Math.min(OBSTACLE_GROUPS.length, level - 3);
+
+      for(let i=0;i<stages;i++){
+        for(const [x,y] of OBSTACLE_GROUPS[i]){
+          blocked.add(macroKey(x,y));
         }
       }
 
-      for(let x=COLS-1;x>=1;x--) out.push({x:x,y:0});
-
-      if(out.length !== TOTAL) throw new Error('Hamiltonian cycle generation failed');
-      cycle = out;
-      cycleIndex = new Map();
-      cycle.forEach((p,i) => cycleIndex.set(key(p), i));
+      return blocked;
     }
 
-    function beep(freq, duration){
+    function addEdge(adj, a, b){
+      const ak = pointKey(a);
+      const bk = pointKey(b);
+      if(!adj.has(ak)) adj.set(ak,new Set());
+      if(!adj.has(bk)) adj.set(bk,new Set());
+      adj.get(ak).add(bk);
+      adj.get(bk).add(ak);
+    }
+
+    function removeEdge(adj, a, b){
+      const ak = pointKey(a);
+      const bk = pointKey(b);
+      if(adj.has(ak)) adj.get(ak).delete(bk);
+      if(adj.has(bk)) adj.get(bk).delete(ak);
+    }
+
+    function buildLevelCycle(){
+      const blockedMacros = obstacleMacrosForLevel();
+      obstacles = new Set();
+
+      for(const mk of blockedMacros){
+        const [mx,my] = mk.split(':').map(Number);
+        for(let oy=0;oy<2;oy++){
+          for(let ox=0;ox<2;ox++){
+            obstacles.add(cellKey(mx*2+ox,my*2+oy));
+          }
+        }
+      }
+
+      const active = [];
+      for(let my=0;my<MACRO_H;my++){
+        for(let mx=0;mx<MACRO_W;mx++){
+          if(!blockedMacros.has(macroKey(mx,my))) active.push({x:mx,y:my});
+        }
+      }
+
+      const activeSet = new Set(active.map(m=>macroKey(m.x,m.y)));
+      const rnd = seededRandom(0x3310 + level * 7919);
+      const start = active[Math.floor(rnd()*active.length)];
+      const visited = new Set([macroKey(start.x,start.y)]);
+      const stack = [start];
+      const treeEdges = [];
+
+      while(stack.length){
+        const current = stack[stack.length-1];
+        const options = [
+          {x:current.x+1,y:current.y},
+          {x:current.x-1,y:current.y},
+          {x:current.x,y:current.y+1},
+          {x:current.x,y:current.y-1}
+        ].filter(n =>
+          n.x>=0 && n.x<MACRO_W &&
+          n.y>=0 && n.y<MACRO_H &&
+          activeSet.has(macroKey(n.x,n.y)) &&
+          !visited.has(macroKey(n.x,n.y))
+        );
+
+        shuffle(options,rnd);
+
+        if(!options.length){
+          stack.pop();
+          continue;
+        }
+
+        const next = options[0];
+        visited.add(macroKey(next.x,next.y));
+        treeEdges.push([current,next]);
+        stack.push(next);
+      }
+
+      if(visited.size !== active.length){
+        throw new Error('Obstacle layout disconnected the board');
+      }
+
+      const adj = new Map();
+
+      for(const m of active){
+        const a={x:m.x*2,y:m.y*2};
+        const b={x:m.x*2+1,y:m.y*2};
+        const c={x:m.x*2+1,y:m.y*2+1};
+        const d={x:m.x*2,y:m.y*2+1};
+        addEdge(adj,a,b);
+        addEdge(adj,b,c);
+        addEdge(adj,c,d);
+        addEdge(adj,d,a);
+      }
+
+      for(const [m1,m2] of treeEdges){
+        if(m1.y === m2.y){
+          const left = m1.x < m2.x ? m1 : m2;
+          const right = m1.x < m2.x ? m2 : m1;
+          const y = left.y * 2;
+
+          const b={x:left.x*2+1,y:y};
+          const c={x:left.x*2+1,y:y+1};
+          const aR={x:right.x*2,y:y};
+          const dR={x:right.x*2,y:y+1};
+
+          removeEdge(adj,b,c);
+          removeEdge(adj,aR,dR);
+          addEdge(adj,b,aR);
+          addEdge(adj,c,dR);
+        }else{
+          const top = m1.y < m2.y ? m1 : m2;
+          const bottom = m1.y < m2.y ? m2 : m1;
+          const x = top.x * 2;
+
+          const d={x:x,y:top.y*2+1};
+          const c={x:x+1,y:top.y*2+1};
+          const aB={x:x,y:bottom.y*2};
+          const bB={x:x+1,y:bottom.y*2};
+
+          removeEdge(adj,c,d);
+          removeEdge(adj,aB,bB);
+          addEdge(adj,d,aB);
+          addEdge(adj,c,bB);
+        }
+      }
+
+      const expected = active.length * 4;
+      const startKey = adj.keys().next().value;
+      const built = [];
+      let previous = null;
+      let current = startKey;
+
+      do{
+        built.push(parseCellKey(current));
+        const ns = [...adj.get(current)];
+        if(ns.length !== 2) throw new Error('Invalid cycle degree');
+        const next = ns[0] !== previous ? ns[0] : ns[1];
+        previous = current;
+        current = next;
+
+        if(built.length > expected + 1) throw new Error('Cycle overflow');
+      }while(current !== startKey);
+
+      if(built.length !== expected){
+        throw new Error('Cycle length mismatch');
+      }
+
+      cycle = built;
+      cycleIndex = new Map();
+      cycle.forEach((p,i)=>cycleIndex.set(pointKey(p),i));
+    }
+
+    function forwardDistance(a,b){
+      return (b - a + cycle.length) % cycle.length;
+    }
+
+    function gridNeighbors(p){
+      const out = [];
+      if(p.x>0) out.push({x:p.x-1,y:p.y});
+      if(p.x<COLS-1) out.push({x:p.x+1,y:p.y});
+      if(p.y>0) out.push({x:p.x,y:p.y-1});
+      if(p.y<ROWS-1) out.push({x:p.x,y:p.y+1});
+      return out;
+    }
+
+    function spawnFood(){
+      const occupied = new Set(snake.map(pointKey));
+      const free = cycle.filter(p=>!occupied.has(pointKey(p)));
+
+      if(!free.length){
+        food = null;
+        completeLevel();
+        return;
+      }
+
+      food = {...free[Math.floor(Math.random()*free.length)]};
+    }
+
+    function chooseMove(){
+      const head = snake[0];
+      const tail = snake[snake.length-1];
+      const hi = cycleIndex.get(pointKey(head));
+      const ti = cycleIndex.get(pointKey(tail));
+      const fi = cycleIndex.get(pointKey(food));
+
+      const tailGap = forwardDistance(hi,ti);
+      const foodGap = forwardDistance(hi,fi);
+
+      const occupied = new Set(snake.slice(0,-1).map(pointKey));
+      const candidates = [];
+
+      for(const n of gridNeighbors(head)){
+        const nk = pointKey(n);
+        if(!cycleIndex.has(nk)) continue;
+        if(occupied.has(nk)) continue;
+
+        const ni = cycleIndex.get(nk);
+        const advance = forwardDistance(hi,ni);
+
+        if(advance <= 0 || advance >= tailGap) continue;
+
+        const eating = n.x===food.x && n.y===food.y;
+        const safetyGap = Math.min(
+          10,
+          Math.max(1, Math.floor(snake.length * 0.012))
+        );
+
+        if(advance >= Math.max(1,tailGap - safetyGap) && !eating) continue;
+
+        const canReachFoodWithoutPassing = advance <= foodGap;
+
+        let score = -Infinity;
+
+        if(canReachFoodWithoutPassing){
+          const manhattan = Math.abs(n.x-food.x)+Math.abs(n.y-food.y);
+          score = advance * 100 - manhattan * 4;
+          if(eating) score += 100000;
+        }else{
+          score = -advance;
+        }
+
+        candidates.push({p:n,score,advance});
+      }
+
+      if(candidates.length){
+        const towardFood = candidates.filter(c=>c.advance<=foodGap);
+
+        if(towardFood.length){
+          towardFood.sort((a,b)=>b.score-a.score);
+          return towardFood[0].p;
+        }
+      }
+
+      const next = cycle[(hi+1)%cycle.length];
+      return {...next};
+    }
+
+    function same(a,b){
+      return !!a && !!b && a.x===b.x && a.y===b.y;
+    }
+
+    function step(){
+      clearTimeout(timer);
+
+      if(!running || transitioning) return;
+
+      const next = chooseMove();
+      const willEat = same(next,food);
+      const blockedBody = new Set((willEat ? snake : snake.slice(0,-1)).map(pointKey));
+
+      if(blockedBody.has(pointKey(next)) || obstacles.has(pointKey(next))){
+        recoverLevel();
+        return;
+      }
+
+      snake.unshift(next);
+
+      if(willEat){
+        foodCount++;
+        beep(720,0.03);
+
+        if(snake.length >= cycle.length){
+          updateHud();
+          draw();
+          completeLevel();
+          return;
+        }
+
+        spawnFood();
+      }else{
+        snake.pop();
+      }
+
+      updateHud();
+      draw();
+      timer = setTimeout(step,levelDelay());
+    }
+
+    function beep(freq,duration){
       if(!soundOn) return;
+
       try{
-        audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'square';
-        osc.frequency.value = freq;
-        gain.gain.value = 0.035;
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
-        osc.stop(audioCtx.currentTime + duration);
+        audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
+        const o=audioCtx.createOscillator();
+        const g=audioCtx.createGain();
+        o.type='square';
+        o.frequency.value=freq;
+        g.gain.value=.035;
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.start();
+        g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+duration);
+        o.stop(audioCtx.currentTime+duration);
       }catch(e){}
     }
 
-    function resetLevel(){
+    function startLevel(){
+      clearTimeout(timer);
       transitioning = false;
-      phase = 'CHASE';
-      packingMoves = 0;
-      levelFood = 0;
-      chasePath = [];
+      running = true;
+      foodCount = 0;
+
+      buildLevelCycle();
 
       snake = [
         {...cycle[4]},
@@ -161,252 +472,76 @@
         {...cycle[0]}
       ];
 
-      spawnRandomFood();
-      running = true;
+      spawnFood();
       overlay.classList.add('hidden');
-      pauseBtn.textContent = 'PAUSE';
+      pauseBtn.textContent='PAUSE';
+
       updateHud();
       draw();
-    }
 
-    function spawnRandomFood(){
-      const occupied = new Set(snake.map(key));
-      const free = [];
-      for(const p of cycle){
-        if(!occupied.has(key(p))) free.push(p);
-      }
-      food = free.length ? {...free[Math.floor(Math.random() * free.length)]} : null;
-      chasePath = [];
-    }
-
-    function nextCycleCell(){
-      const hi = cycleIndex.get(key(snake[0]));
-      return {...cycle[(hi + 1) % TOTAL]};
-    }
-
-    function findSafeChasePath(){
-      if(!food) return [];
-
-      const head = snake[0];
-      const tail = snake[snake.length - 1];
-      const hi = cycleIndex.get(key(head));
-      const ti = cycleIndex.get(key(tail));
-      const fi = cycleIndex.get(key(food));
-
-      const distanceToTail = forwardDistance(hi, ti);
-      const distanceToFood = forwardDistance(hi, fi);
-
-      if(distanceToFood <= 0 || distanceToFood >= distanceToTail) return [];
-      if(snake.length < TOTAL - 1 && forwardDistance(fi, ti) <= 1) return [];
-
-      const occupied = new Set(snake.slice(1).map(key));
-      const queue = [head];
-      let qIndex = 0;
-      const previous = new Map();
-      previous.set(key(head), null);
-
-      const directions = [
-        {x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}
-      ];
-
-      while(qIndex < queue.length){
-        const current = queue[qIndex++];
-        const currentOrder = forwardDistance(hi, cycleIndex.get(key(current)));
-
-        for(const d of directions){
-          const next = {x:current.x+d.x, y:current.y+d.y};
-          if(next.x < 0 || next.x >= COLS || next.y < 0 || next.y >= ROWS) continue;
-
-          const nk = key(next);
-          if(previous.has(nk) || occupied.has(nk)) continue;
-
-          const ni = cycleIndex.get(nk);
-          const nextOrder = forwardDistance(hi, ni);
-
-          if(nextOrder <= currentOrder || nextOrder >= distanceToTail) continue;
-
-          previous.set(nk, current);
-
-          if(same(next, food)){
-            const path = [];
-            let cursor = next;
-
-            while(!same(cursor, head)){
-              path.push({...cursor});
-              cursor = previous.get(key(cursor));
-            }
-
-            path.reverse();
-            return path;
-          }
-
-          queue.push(next);
-        }
-      }
-
-      return [];
-    }
-
-    function chooseAutoMove(){
-      if(phase === 'PACK' || phase === 'FILL') return nextCycleCell();
-
-      if(chasePath.length === 0) chasePath = findSafeChasePath();
-
-      if(chasePath.length){
-        return chasePath.shift();
-      }
-
-      return nextCycleCell();
-    }
-
-    function beginPacking(){
-      phase = 'PACK';
-      food = null;
-      chasePath = [];
-      packingMoves = snake.length;
-      statusEl.textContent = 'AUTO PACKING';
-    }
-
-    function beginFill(){
-      phase = 'FILL';
-      food = nextCycleCell();
-      statusEl.textContent = 'AUTO FILLING';
-      beep(520, 0.05);
+      timer=setTimeout(step,350);
     }
 
     function completeLevel(){
       if(transitioning) return;
+
       transitioning = true;
       running = false;
-      phase = 'COMPLETE';
+      clearTimeout(timer);
       food = null;
-      updateHud();
-      draw();
 
-      beep(880, 0.07);
-      setTimeout(() => beep(1040, 0.09), 85);
+      beep(900,.08);
+      setTimeout(()=>beep(1080,.1),100);
 
       overlay.innerHTML =
         '<div><div class="big">LEVEL ' + level + ' COMPLETE</div>' +
-        '<div class="small">SCREEN FILLED 100%<br>NEXT LEVEL STARTING...</div></div>';
-      overlay.classList.remove('hidden');
-      statusEl.textContent = 'LEVEL COMPLETE';
+        '<div class="small">AREA FILLED 100%<br>NEXT LEVEL...</div></div>';
 
-      setTimeout(() => {
+      overlay.classList.remove('hidden');
+      statusEl.textContent='LEVEL COMPLETE';
+
+      setTimeout(()=>{
         level++;
-        resetLevel();
-      }, 900);
+        startLevel();
+      },1200);
     }
 
-    function emergencyMove(){
-      const head = snake[0];
-      const occupied = new Set(snake.map(key));
-      const directions = [
-        {x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}
-      ];
-
-      for(const d of directions){
-        const p = {x:head.x+d.x,y:head.y+d.y};
-        if(p.x>=0 && p.x<COLS && p.y>=0 && p.y<ROWS && !occupied.has(key(p))) return p;
-      }
-      return null;
-    }
-
-    function moveOneStep(){
-      if(!running || transitioning) return;
-
-      let next = chooseAutoMove();
-      const occupied = new Set(snake.map(key));
-
-      if(!next || next.x < 0 || next.x >= COLS || next.y < 0 || next.y >= ROWS || occupied.has(key(next))){
-        next = emergencyMove();
-        chasePath = [];
-      }
-
-      if(!next){
-        restartAfterFault();
-        return;
-      }
-
-      snake.unshift(next);
-
-      const ate = food && same(next, food);
-
-      if(ate){
-        levelFood++;
-        totalFood++;
-        chasePath = [];
-        beep(700, 0.025);
-
-        if(snake.length >= TOTAL){
-          updateHud();
-          completeLevel();
-          return;
-        }
-
-        if(phase === 'CHASE' && snake.length >= CHASE_TARGET){
-          beginPacking();
-        }else if(phase === 'FILL'){
-          food = nextCycleCell();
-        }else{
-          spawnRandomFood();
-        }
-      }else{
-        snake.pop();
-
-        if(phase === 'PACK'){
-          packingMoves--;
-          if(packingMoves <= 0) beginFill();
-        }
-      }
-    }
-
-    function restartAfterFault(){
-      running = false;
+    function recoverLevel(){
       transitioning = true;
+      running = false;
+      clearTimeout(timer);
+
       overlay.innerHTML =
-        '<div><div class="big">RECOVERING</div><div class="small">AUTO RESTART</div></div>';
+        '<div><div class="big">RECOVERING</div>' +
+        '<div class="small">REBUILDING SAFE ROUTE</div></div>';
+
       overlay.classList.remove('hidden');
+      statusEl.textContent='RECOVERING';
 
-      setTimeout(() => resetLevel(), 400);
-    }
-
-    function effectiveMovesPerFrame(){
-      return SPEEDS[speedIndex] + Math.min(6, Math.floor((level - 1) / 2));
-    }
-
-    function gameLoop(){
-      if(running && !transitioning){
-        const moves = effectiveMovesPerFrame();
-        for(let i=0;i<moves;i++){
-          moveOneStep();
-          if(!running || transitioning) break;
-        }
-        updateHud();
-        draw();
-      }
-      raf = requestAnimationFrame(gameLoop);
+      setTimeout(()=>startLevel(),650);
     }
 
     function updateHud(){
+      const obstacleCells = obstacles.size;
+      const total = cycle.length;
+
       leftHud.textContent =
         'LEVEL ' + String(level).padStart(2,'0') +
-        '  FOOD ' + String(levelFood).padStart(3,'0');
+        (obstacleCells ? '  WALL ' + String(obstacleCells).padStart(2,'0') : '');
 
       rightHud.textContent =
-        'LEN ' + String(snake.length).padStart(3,'0') + '/' + TOTAL;
+        'LEN ' + String(snake.length).padStart(3,'0') + '/' + total;
 
-      const pct = (snake.length / TOTAL) * 100;
-      progressBar.style.width = pct.toFixed(1) + '%';
+      progressBar.style.width =
+        ((snake.length/total)*100).toFixed(1)+'%';
 
-      if(phase === 'CHASE') statusEl.textContent = 'AUTO CHASE';
-      if(phase === 'PACK') statusEl.textContent = 'AUTO PACKING';
-      if(phase === 'FILL') statusEl.textContent = 'AUTO FILLING';
+      statusEl.textContent =
+        obstacleCells ? 'AUTO HUNT • OBSTACLES' : 'AUTO HUNT';
     }
 
     function drawGrid(){
-      ctx.strokeStyle = GRID;
-      ctx.lineWidth = 1;
+      ctx.strokeStyle=GRID;
+      ctx.lineWidth=1;
 
       for(let x=0;x<=W;x+=CELL){
         ctx.beginPath();
@@ -423,92 +558,106 @@
       }
     }
 
-    function drawSnakePixel(p, head){
-      const px = p.x * CELL;
-      const py = p.y * CELL;
+    function drawObstacleCell(x,y){
+      const px=x*CELL;
+      const py=y*CELL;
 
-      ctx.fillStyle = PIXEL;
-      ctx.fillRect(px+1, py+1, CELL-2, CELL-2);
+      ctx.fillStyle=PIXEL;
+      ctx.fillRect(px+1,py+1,CELL-2,CELL-2);
+
+      ctx.fillStyle=LCD;
+      ctx.fillRect(px+3,py+3,2,2);
+    }
+
+    function drawSnakePixel(p,head){
+      const px=p.x*CELL;
+      const py=p.y*CELL;
+
+      ctx.fillStyle=PIXEL;
+      ctx.fillRect(px+1,py+1,CELL-2,CELL-2);
 
       if(head){
-        ctx.fillStyle = LCD;
-        ctx.fillRect(px+2, py+2, 1, 1);
-        ctx.fillRect(px+5, py+2, 1, 1);
+        ctx.fillStyle=LCD;
+        ctx.fillRect(px+2,py+2,1,1);
+        ctx.fillRect(px+5,py+2,1,1);
       }
     }
 
     function drawFood(){
       if(!food) return;
-      const px = food.x * CELL;
-      const py = food.y * CELL;
 
-      ctx.fillStyle = PIXEL;
-      ctx.fillRect(px+2, py+1, 4, 6);
-      ctx.fillRect(px+1, py+2, 6, 4);
+      const px=food.x*CELL;
+      const py=food.y*CELL;
 
-      ctx.fillStyle = LCD;
-      ctx.fillRect(px+3, py+3, 2, 2);
+      ctx.fillStyle=PIXEL;
+      ctx.fillRect(px+2,py+1,4,6);
+      ctx.fillRect(px+1,py+2,6,4);
+
+      ctx.fillStyle=LCD;
+      ctx.fillRect(px+3,py+3,2,2);
     }
 
     function draw(){
-      ctx.fillStyle = LCD;
+      ctx.fillStyle=LCD;
       ctx.fillRect(0,0,W,H);
+
       drawGrid();
+
+      for(const k of obstacles){
+        const p=parseCellKey(k);
+        drawObstacleCell(p.x,p.y);
+      }
+
       drawFood();
 
       for(let i=snake.length-1;i>=0;i--){
-        drawSnakePixel(snake[i], i===0);
+        drawSnakePixel(snake[i],i===0);
       }
 
-      ctx.strokeStyle = PIXEL;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle=PIXEL;
+      ctx.lineWidth=2;
       ctx.strokeRect(1,1,W-2,H-2);
     }
 
-    pauseBtn.addEventListener('click', () => {
+    pauseBtn.addEventListener('click',()=>{
       if(transitioning) return;
-      running = !running;
-      pauseBtn.textContent = running ? 'PAUSE' : 'RESUME';
+
+      running=!running;
+      pauseBtn.textContent=running?'PAUSE':'RESUME';
 
       if(running){
         overlay.classList.add('hidden');
+        timer=setTimeout(step,levelDelay());
       }else{
-        overlay.innerHTML =
+        clearTimeout(timer);
+        overlay.innerHTML=
           '<div><div class="big">PAUSED</div><div class="small">PRESS RESUME</div></div>';
         overlay.classList.remove('hidden');
       }
     });
 
-    speedBtn.addEventListener('click', () => {
-      speedIndex = (speedIndex + 1) % SPEEDS.length;
-      speedBtn.textContent = 'SPEED ×' + SPEEDS[speedIndex];
-      beep(560,0.03);
+    soundBtn.addEventListener('click',()=>{
+      soundOn=!soundOn;
+      soundBtn.textContent=soundOn?'SOUND ON':'SOUND OFF';
+      if(soundOn) beep(650,.04);
     });
 
-    soundBtn.addEventListener('click', () => {
-      soundOn = !soundOn;
-      soundBtn.textContent = soundOn ? 'SOUND ON' : 'SOUND OFF';
-      if(soundOn) beep(650,0.04);
+    restartBtn.addEventListener('click',()=>{
+      startLevel();
     });
 
-    restartBtn.addEventListener('click', () => {
-      resetLevel();
-    });
-
-    document.addEventListener('visibilitychange', () => {
+    document.addEventListener('visibilitychange',()=>{
       if(document.hidden && running && !transitioning){
-        running = false;
-        pauseBtn.textContent = 'RESUME';
-        overlay.innerHTML =
-          '<div><div class="big">PAUSED</div><div class="small">RETURNED FROM BACKGROUND<br>PRESS RESUME</div></div>';
+        running=false;
+        clearTimeout(timer);
+        pauseBtn.textContent='RESUME';
+        overlay.innerHTML=
+          '<div><div class="big">PAUSED</div><div class="small">PRESS RESUME</div></div>';
         overlay.classList.remove('hidden');
       }
     });
 
-    buildHamiltonianCycle();
-    resetLevel();
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(gameLoop);
+    startLevel();
   })();
   </script>
 </body>
