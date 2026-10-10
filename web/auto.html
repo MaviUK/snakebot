@@ -60,7 +60,7 @@
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">Random food • safe shortcuts • obstacle levels • automatic next level</div>
+      <div class="tips">Food hunting • line closing after 55% • obstacle levels • automatic next level</div>
     </section>
   </main>
 
@@ -123,6 +123,8 @@
     let audioCtx = null;
     let foodCount = 0;
     let plannedPath = [];
+    let closingMode = false;
+    let closureSteps = 0;
     const TEST_SPEEDS = [1,2,4,8];
     let testSpeedIndex = 0;
 
@@ -196,6 +198,40 @@
       if(adj.has(bk)) adj.get(bk).delete(ak);
     }
 
+    function buildStripCycle(){
+      const built = [];
+
+      for(let y=0;y<ROWS;y++){
+        built.push({x:0,y});
+      }
+
+      for(let x=1;x<COLS;x++){
+        built.push({x,y:ROWS-1});
+      }
+
+      for(let y=ROWS-2;y>=0;y--){
+        const rowOffset = (ROWS-1)-y;
+
+        if(rowOffset % 2 === 1){
+          for(let x=COLS-1;x>=1;x--){
+            built.push({x,y});
+          }
+        }else{
+          for(let x=1;x<COLS;x++){
+            built.push({x,y});
+          }
+        }
+      }
+
+      if(built.length !== COLS*ROWS){
+        throw new Error('Strip cycle length mismatch');
+      }
+
+      cycle = built;
+      cycleIndex = new Map();
+      cycle.forEach((p,i)=>cycleIndex.set(pointKey(p),i));
+    }
+
     function buildLevelCycle(){
       const blockedMacros = obstacleMacrosForLevel();
       obstacles = new Set();
@@ -207,6 +243,11 @@
             obstacles.add(cellKey(mx*2+ox,my*2+oy));
           }
         }
+      }
+
+      if(blockedMacros.size === 0){
+        buildStripCycle();
+        return;
       }
 
       const active = [];
@@ -339,11 +380,19 @@
     }
 
     function closureWindowSize(fillRatio){
-      if(fillRatio >= 0.92) return 8;
-      if(fillRatio >= 0.84) return 16;
-      if(fillRatio >= 0.74) return 32;
+      if(fillRatio >= 0.94) return 10;
+      if(fillRatio >= 0.86) return 20;
+      if(fillRatio >= 0.75) return 34;
       if(fillRatio >= 0.64) return 56;
+      if(fillRatio >= 0.55) return 88;
       return Infinity;
+    }
+
+    function activateClosingMode(){
+      if(closingMode) return;
+      closingMode = true;
+      closureSteps = 0;
+      plannedPath = [];
     }
 
     function spawnFood(){
@@ -408,6 +457,25 @@
           0,
           Math.min(windowSize,safeFree.length)
         );
+      }
+
+      if(closingMode){
+        let pool = safeFree;
+
+        if(pool.length > 8){
+          const withoutImmediate = pool.filter(item=>item.advance >= 4);
+          if(withoutImmediate.length >= 4){
+            pool = withoutImmediate;
+          }
+        }
+
+        const pick = pool[
+          Math.floor(Math.random()*pool.length)
+        ];
+
+        food = {...pick.p};
+        plannedPath = [];
+        return;
       }
 
       const viable = [];
@@ -563,6 +631,18 @@
     }
 
     function chooseMove(){
+      const fillRatio = snake.length / cycle.length;
+
+      if(!closingMode && fillRatio >= 0.55){
+        activateClosingMode();
+      }
+
+      if(closingMode){
+        const head = snake[0];
+        const hi = cycleIndex.get(pointKey(head));
+        return {...cycle[(hi+1)%cycle.length]};
+      }
+
       if(plannedPath.length){
         return plannedPath.shift();
       }
@@ -598,6 +678,10 @@
       }
 
       snake.unshift(next);
+
+      if(closingMode){
+        closureSteps++;
+      }
 
       if(willEat){
         foodCount++;
@@ -644,6 +728,8 @@
       running = true;
       foodCount = 0;
       plannedPath = [];
+      closingMode = false;
+      closureSteps = 0;
 
       buildLevelCycle();
 
@@ -720,11 +806,17 @@
 
       const fillRatio = snake.length / total;
 
-      if(fillRatio >= 0.74){
+      if(closingMode){
+        const straightened = closureSteps >= snake.length;
+
         statusEl.textContent =
-          obstacleCells
-            ? 'CLOSING AREAS • OBSTACLES'
-            : 'CLOSING AREAS';
+          straightened
+            ? (obstacleCells
+                ? 'CLOSING LINES • OBSTACLES'
+                : 'CLOSING LINES')
+            : (obstacleCells
+                ? 'STRAIGHTENING • OBSTACLES'
+                : 'STRAIGHTENING LINES');
       }else{
         statusEl.textContent =
           obstacleCells
