@@ -87,7 +87,7 @@
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">Food first • nearby bonuses • avoid bombs • closing at 85%</div>
+      <div class="tips">Food first • random timed hazards & bonuses • closing at 85%</div>
     </section>
   </main>
 
@@ -152,6 +152,7 @@
     let bonuses = [];
     let doublePointsSteps = 0;
     let doubleFoodSteps = 0;
+    let bombSpawnCooldownSteps = 0;
     let bonusSpawnCooldownSteps = 0;
     let obstacles = new Set();
     let cycle = [];
@@ -173,7 +174,6 @@
     const BOMB_LIFETIME_STEPS = 60;
     const BONUS_LIFETIME_STEPS = 110;
     const BONUS_EFFECT_STEPS = 140;
-    const BONUS_RESPAWN_COOLDOWN_STEPS = 55;
     const BONUS_MAX_CHASE_STEPS = 12;
     const BONUS_EXTRA_DETOUR_STEPS = 3;
     let testSpeedIndex = 0;
@@ -449,15 +449,47 @@
       return Math.min(20,baseFoodTargetCount()*multiplier);
     }
 
-    function bombTargetCount(){
+    function bombMaxCount(){
       if(level < 8) return 0;
-      return Math.min(4, 1 + Math.floor((level - 8) / 2));
+      return Math.min(4, 1 + Math.floor((level - 8) / 3));
     }
 
-    function bonusTargetCount(){
+    function bonusMaxCount(){
       if(level < 10) return 0;
-      if(level < 14) return 1;
+      if(level < 16) return 1;
       return 2;
+    }
+
+    function randomSteps(min,max){
+      return Math.floor(
+        min + Math.random() * (max-min+1)
+      );
+    }
+
+    function scheduleNextBomb(){
+      if(level < 8){
+        bombSpawnCooldownSteps = Infinity;
+        return;
+      }
+
+      const levelHelp = Math.min(22,Math.max(0,level-8)*2);
+      bombSpawnCooldownSteps = randomSteps(
+        Math.max(18,46-levelHelp),
+        Math.max(50,105-levelHelp)
+      );
+    }
+
+    function scheduleNextBonus(){
+      if(level < 10){
+        bonusSpawnCooldownSteps = Infinity;
+        return;
+      }
+
+      const levelHelp = Math.min(26,Math.max(0,level-10)*2);
+      bonusSpawnCooldownSteps = randomSteps(
+        Math.max(28,72-levelHelp),
+        Math.max(70,155-levelHelp)
+      );
     }
 
     function bombCells(bomb){
@@ -735,15 +767,19 @@
       return true;
     }
 
-    function ensureBombCount(){
-      const target = bombTargetCount();
+    function maybeSpawnBomb(){
+      const maxBombs = bombMaxCount();
 
-      while(bombs.length < target){
-        if(!addOneBomb()) break;
-      }
+      if(maxBombs <= 0) return;
+      if(bombs.length >= maxBombs) return;
+      if(bombSpawnCooldownSteps > 0) return;
 
-      if(bombs.length > target){
-        bombs = bombs.slice(0,target);
+      const spawnChance =
+        Math.min(0.16,0.07 + Math.max(0,level-8)*0.008);
+
+      if(Math.random() < spawnChance){
+        addOneBomb();
+        scheduleNextBomb();
       }
     }
 
@@ -782,26 +818,26 @@
       return true;
     }
 
-    function ensureBonusCount(){
-      const target = bonusTargetCount();
+    function maybeSpawnBonus(){
+      const maxBonuses = bonusMaxCount();
 
-      if(bonusSpawnCooldownSteps > 0){
-        if(bonuses.length > target){
-          bonuses = bonuses.slice(0,target);
-        }
-        return;
-      }
+      if(maxBonuses <= 0) return;
+      if(bonuses.length >= maxBonuses) return;
+      if(bonusSpawnCooldownSteps > 0) return;
 
-      while(bonuses.length < target){
-        if(!addOneBonus()) break;
-      }
+      const spawnChance =
+        Math.min(0.10,0.045 + Math.max(0,level-10)*0.004);
 
-      if(bonuses.length > target){
-        bonuses = bonuses.slice(0,target);
+      if(Math.random() < spawnChance){
+        addOneBonus();
+        scheduleNextBonus();
       }
     }
 
     function tickTimedItems(){
+      const bombsBefore = bombs.length;
+      const bonusesBefore = bonuses.length;
+
       for(const bomb of bombs){
         bomb.ttl--;
       }
@@ -814,12 +850,39 @@
 
       bonuses = bonuses.filter(bonus=>bonus.ttl>0);
 
+      if(
+        bombs.length < bombsBefore &&
+        bombSpawnCooldownSteps <= 0
+      ){
+        scheduleNextBomb();
+      }
+
+      if(
+        bonuses.length < bonusesBefore &&
+        bonusSpawnCooldownSteps <= 0
+      ){
+        scheduleNextBonus();
+      }
+
       if(doublePointsSteps > 0) doublePointsSteps--;
       if(doubleFoodSteps > 0) doubleFoodSteps--;
-      if(bonusSpawnCooldownSteps > 0) bonusSpawnCooldownSteps--;
 
-      ensureBombCount();
-      ensureBonusCount();
+      if(
+        Number.isFinite(bombSpawnCooldownSteps) &&
+        bombSpawnCooldownSteps > 0
+      ){
+        bombSpawnCooldownSteps--;
+      }
+
+      if(
+        Number.isFinite(bonusSpawnCooldownSteps) &&
+        bonusSpawnCooldownSteps > 0
+      ){
+        bonusSpawnCooldownSteps--;
+      }
+
+      maybeSpawnBomb();
+      maybeSpawnBonus();
 
       if(doubleFoodSteps > 0){
         ensureFoodCount();
@@ -836,7 +899,7 @@
         ensureFoodCount();
       }
 
-      bonusSpawnCooldownSteps = BONUS_RESPAWN_COOLDOWN_STEPS;
+      scheduleNextBonus();
       hazardMessageUntil = Date.now() + 1200;
       plannedPath = [];
       beep(980,0.06);
@@ -876,8 +939,6 @@
 
     function spawnFood(){
       ensureFoodCount();
-      ensureBombCount();
-      ensureBonusCount();
     }
 
     function orderedPathTo(target){
@@ -1173,7 +1234,7 @@
         beep(180,0.12);
         setTimeout(()=>beep(130,0.12),90);
 
-        ensureBombCount();
+        scheduleNextBomb();
         chooseFoodTarget();
       }else if(hitBonus){
         const bonus = bonuses[bonusIndex];
@@ -1242,7 +1303,10 @@
       bonuses = [];
       doublePointsSteps = 0;
       doubleFoodSteps = 0;
+      bombSpawnCooldownSteps = 0;
       bonusSpawnCooldownSteps = 0;
+      scheduleNextBomb();
+      scheduleNextBonus();
       hazardMessage = '';
       hazardMessageUntil = 0;
       currentDirection = null;
