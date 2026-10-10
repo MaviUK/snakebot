@@ -615,6 +615,31 @@
         Math.max(1, Math.floor(snake.length * 0.01))
       );
 
+      if(fillRatio < 0.75){
+        const wholeBoard = cycle
+          .filter(p=>{
+            const pk = pointKey(p);
+            if(occupied.has(pk)) return false;
+
+            const distance =
+              Math.abs(p.x-head.x) +
+              Math.abs(p.y-head.y);
+
+            return distance >= 7;
+          })
+          .map(p=>({
+            p,
+            advance:forwardDistance(
+              headIndex,
+              cycleIndex.get(pointKey(p))
+            )
+          }));
+
+        if(wholeBoard.length){
+          return wholeBoard;
+        }
+      }
+
       let safeFree = cycle
         .filter(p=>{
           const pk = pointKey(p);
@@ -677,7 +702,13 @@
       let pool = candidates;
 
       if(pool.length > 8){
-        const notImmediate = pool.filter(item=>item.advance >= 3);
+        const head = snake[0];
+        const notImmediate = pool.filter(item=>{
+          const distance =
+            Math.abs(item.p.x-head.x) +
+            Math.abs(item.p.y-head.y);
+          return distance >= 7;
+        });
 
         if(notImmediate.length >= 3){
           pool = notImmediate;
@@ -1013,6 +1044,66 @@
       ensureFoodCount();
     }
 
+    function directSafePathTo(target){
+      if(!target || !snake.length) return [];
+
+      const head = snake[0];
+      const startKey = pointKey(head);
+      const targetKey = pointKey(target);
+      const blocked = new Set(
+        snake.slice(0,-1).map(pointKey)
+      );
+
+      const queue = [head];
+      const previous = new Map([[startKey,null]]);
+      let index = 0;
+
+      while(index < queue.length){
+        const current = queue[index++];
+        const currentKey = pointKey(current);
+
+        if(currentKey === targetKey){
+          const path = [];
+          let cursorKey = targetKey;
+
+          while(cursorKey !== startKey){
+            path.push(parseCellKey(cursorKey));
+            cursorKey = previous.get(cursorKey);
+          }
+
+          path.reverse();
+          return path;
+        }
+
+        const neighbors = gridNeighbors(current)
+          .filter(next=>{
+            const nk = pointKey(next);
+            if(previous.has(nk)) return false;
+            if(obstacles.has(nk)) return false;
+            if(isBombCell(next)) return false;
+            if(blocked.has(nk) && nk !== targetKey) return false;
+            return true;
+          })
+          .sort((a,b)=>{
+            const da =
+              Math.abs(a.x-target.x) +
+              Math.abs(a.y-target.y);
+            const db =
+              Math.abs(b.x-target.x) +
+              Math.abs(b.y-target.y);
+            return da-db;
+          });
+
+        for(const next of neighbors){
+          const nk = pointKey(next);
+          previous.set(nk,currentKey);
+          queue.push(next);
+        }
+      }
+
+      return [];
+    }
+
     function orderedPathTo(target){
       if(!target || !snake.length) return [];
 
@@ -1232,7 +1323,11 @@
       }
 
       const foodPath = food
-        ? orderedPathTo(food)
+        ? (
+            directSafePathTo(food).length
+              ? directSafePathTo(food)
+              : orderedPathTo(food)
+          )
         : [];
 
       const bonusChoice = nearestBonusPath();
@@ -1248,17 +1343,17 @@
         );
 
       if(
-        bonusIsWorthDetour &&
-        moveKeepsEscape(bonusChoice.path[0])
-      ){
-        return bonusChoice.path[0];
-      }
-
-      if(
         foodPath.length &&
         moveKeepsEscape(foodPath[0])
       ){
         return foodPath[0];
+      }
+
+      if(
+        bonusIsWorthDetour &&
+        moveKeepsEscape(bonusChoice.path[0])
+      ){
+        return bonusChoice.path[0];
       }
 
       const head = snake[0];
