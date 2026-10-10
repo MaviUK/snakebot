@@ -28,7 +28,7 @@
     .status{text-align:center;min-height:18px;margin-top:5px;font-family:monospace;font-size:12px;color:#dce7dc;font-weight:800}
     .progress{height:6px;margin:7px 3px 0;border-radius:10px;background:#183b35;overflow:hidden;box-shadow:inset 0 1px 2px #0008}
     .progress>div{height:100%;width:0;background:#cbd8c9;transition:width .08s linear}
-    .controls{padding-top:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .controls{padding-top:20px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
     button{font:inherit;color:#eef5ef;user-select:none;touch-action:manipulation}
     .soft{height:44px;border-radius:18px 18px 28px 28px;border:1px solid #79968f66;background:linear-gradient(#52756d,#2a4943);box-shadow:inset 0 2px 2px #ffffff22,0 3px 4px #0007;font-weight:800;font-size:11px;letter-spacing:.04em}
     .soft:active{transform:translateY(2px);box-shadow:inset 0 2px 5px #0008}
@@ -55,6 +55,7 @@
 
       <div class="controls">
         <button id="pauseBtn" class="soft">PAUSE</button>
+        <button id="testSpeedBtn" class="soft">TEST SPEED ×1</button>
         <button id="soundBtn" class="soft">SOUND OFF</button>
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
@@ -75,6 +76,7 @@
     const statusEl = document.getElementById('status');
     const progressBar = document.getElementById('progressBar');
     const pauseBtn = document.getElementById('pauseBtn');
+    const testSpeedBtn = document.getElementById('testSpeedBtn');
     const soundBtn = document.getElementById('soundBtn');
     const restartBtn = document.getElementById('restartBtn');
 
@@ -121,6 +123,8 @@
     let audioCtx = null;
     let foodCount = 0;
     let plannedPath = [];
+    const TEST_SPEEDS = [1,2,4,8];
+    let testSpeedIndex = 0;
 
     function cellKey(x, y){ return x + ',' + y; }
     function pointKey(p){ return cellKey(p.x, p.y); }
@@ -150,7 +154,15 @@
     }
 
     function levelDelay(){
-      return Math.max(72, Math.round(122 - (level - 1) * 1.5));
+      const normalDelay = Math.max(
+        72,
+        Math.round(122 - (level - 1) * 1.5)
+      );
+
+      return Math.max(
+        10,
+        Math.round(normalDelay / TEST_SPEEDS[testSpeedIndex])
+      );
     }
 
     function obstacleMacrosForLevel(){
@@ -802,6 +814,19 @@
         overlay.innerHTML=
           '<div><div class="big">PAUSED</div><div class="small">PRESS RESUME</div></div>';
         overlay.classList.remove('hidden');
+      }
+    });
+
+    testSpeedBtn.addEventListener('click',()=>{
+      testSpeedIndex =
+        (testSpeedIndex + 1) % TEST_SPEEDS.length;
+
+      testSpeedBtn.textContent =
+        'TEST SPEED ×' + TEST_SPEEDS[testSpeedIndex];
+
+      if(running && !transitioning){
+        clearTimeout(timer);
+        timer=setTimeout(step,levelDelay());
       }
     });
 
