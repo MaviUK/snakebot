@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "uk.co.snakebot.snake"
+    namespace = "uk.co.snakebot.autoplayer"
     compileSdk = 35
 
     defaultConfig {
