@@ -328,29 +328,116 @@
 
     function spawnFood(){
       plannedPath = [];
-      const occupied = new Set(snake.map(pointKey));
-      const free = cycle.filter(p=>!occupied.has(pointKey(p)));
 
-      if(!free.length){
-        food = null;
-        completeLevel();
+      const occupied = new Set(snake.map(pointKey));
+      const head = snake[0];
+      const tail = snake[snake.length-1];
+      const headIndex = cycleIndex.get(pointKey(head));
+      const tailIndex = cycleIndex.get(pointKey(tail));
+      const tailGap = forwardDistance(headIndex, tailIndex);
+      const safetyMargin = Math.min(8, Math.max(1, Math.floor(snake.length * 0.01)));
+
+      const safeFree = cycle.filter(p=>{
+        const pk = pointKey(p);
+        if(occupied.has(pk)) return false;
+
+        const idx = cycleIndex.get(pk);
+        const advance = forwardDistance(headIndex, idx);
+
+        return advance > 0 && advance < Math.max(1, tailGap - safetyMargin);
+      });
+
+      if(!safeFree.length){
+        const anyFree = cycle.filter(p=>!occupied.has(pointKey(p)));
+
+        if(!anyFree.length){
+          food = null;
+          completeLevel();
+          return;
+        }
+
+        food = {...anyFree[0]};
         return;
       }
 
-      food = {...free[Math.floor(Math.random()*free.length)]};
+      const shuffled = safeFree.slice();
+
+      for(let i=shuffled.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];
+      }
+
+      const sample = shuffled.slice(0, Math.min(36, shuffled.length));
+      const good = [];
+      let best = null;
+
+      for(const candidate of sample){
+        const path = orderedPathTo(candidate);
+        if(!path.length) continue;
+
+        const manhattan =
+          Math.abs(head.x-candidate.x) +
+          Math.abs(head.y-candidate.y);
+
+        const detourRatio = path.length / Math.max(1, manhattan);
+
+        if(!best || detourRatio < best.ratio){
+          best = {candidate,path,ratio:detourRatio};
+        }
+
+        if(detourRatio <= 1.35){
+          good.push({candidate,path});
+        }
+      }
+
+      const pick = good.length
+        ? good[Math.floor(Math.random()*good.length)]
+        : best;
+
+      if(pick){
+        food = {...pick.candidate};
+        plannedPath = pick.path.slice();
+        return;
+      }
+
+      food = {...safeFree[Math.floor(Math.random()*safeFree.length)]};
     }
 
-    function bfsPath(start, target, blocked, mode=0){
-      const startKey = pointKey(start);
+    function orderedPathTo(target){
+      if(!target || !snake.length) return [];
+
+      const head = snake[0];
+      const tail = snake[snake.length-1];
+      const headIndex = cycleIndex.get(pointKey(head));
+      const tailIndex = cycleIndex.get(pointKey(tail));
+      const targetIndex = cycleIndex.get(pointKey(target));
+
+      if(
+        headIndex === undefined ||
+        tailIndex === undefined ||
+        targetIndex === undefined
+      ){
+        return [];
+      }
+
+      const tailGap = forwardDistance(headIndex, tailIndex);
+      const targetAdvance = forwardDistance(headIndex, targetIndex);
+
+      if(targetAdvance <= 0 || targetAdvance >= tailGap){
+        return [];
+      }
+
+      const startKey = pointKey(head);
       const targetKey = pointKey(target);
-      const queue = [start];
+      const queue = [head];
       const previous = new Map([[startKey, null]]);
       let index = 0;
 
       while(index < queue.length){
         const current = queue[index++];
+        const currentKey = pointKey(current);
 
-        if(pointKey(current) === targetKey){
+        if(currentKey === targetKey){
           const path = [];
           let cursorKey = targetKey;
 
@@ -364,32 +451,41 @@
           return path;
         }
 
-        const neighbors = gridNeighbors(current);
+        const currentCycleIndex = cycleIndex.get(currentKey);
+        const currentAdvance =
+          forwardDistance(headIndex, currentCycleIndex);
 
-        neighbors.sort((a,b)=>{
-          const da = Math.abs(a.x-target.x) + Math.abs(a.y-target.y);
-          const db = Math.abs(b.x-target.x) + Math.abs(b.y-target.y);
+        const neighbors = gridNeighbors(current)
+          .filter(next=>{
+            const nk = pointKey(next);
+            const ni = cycleIndex.get(nk);
 
-          if(da !== db) return da-db;
+            if(ni === undefined) return false;
+            if(previous.has(nk)) return false;
 
-          if(mode === 1) return Math.abs(a.x-target.x)-Math.abs(b.x-target.x);
-          if(mode === 2) return Math.abs(a.y-target.y)-Math.abs(b.y-target.y);
-          if(mode === 3) return a.x-b.x || a.y-b.y;
-          if(mode === 4) return b.x-a.x || b.y-a.y;
-          if(mode === 5) return a.y-b.y || a.x-b.x;
-          if(mode === 6) return b.y-a.y || b.x-a.x;
+            const advance = forwardDistance(headIndex, ni);
 
-          return 0;
-        });
+            return (
+              advance > currentAdvance &&
+              advance <= targetAdvance &&
+              advance < tailGap
+            );
+          })
+          .sort((a,b)=>{
+            const da =
+              Math.abs(a.x-target.x) +
+              Math.abs(a.y-target.y);
+
+            const db =
+              Math.abs(b.x-target.x) +
+              Math.abs(b.y-target.y);
+
+            return da-db;
+          });
 
         for(const next of neighbors){
           const nk = pointKey(next);
-
-          if(previous.has(nk)) continue;
-          if(obstacles.has(nk)) continue;
-          if(blocked.has(nk) && nk !== targetKey) continue;
-
-          previous.set(nk, pointKey(current));
+          previous.set(nk,currentKey);
           queue.push(next);
         }
       }
@@ -397,108 +493,12 @@
       return [];
     }
 
-    function simulateFoodPath(path){
-      if(!path.length) return null;
-
-      const body = snake.map(p=>({...p}));
-
-      for(let i=0;i<path.length;i++){
-        const next = path[i];
-        const eating = i === path.length - 1;
-        const blockedBody = new Set(
-          (eating ? body : body.slice(0,-1)).map(pointKey)
-        );
-
-        if(obstacles.has(pointKey(next)) || blockedBody.has(pointKey(next))){
-          return null;
-        }
-
-        body.unshift({...next});
-
-        if(!eating){
-          body.pop();
-        }
-      }
-
-      return body;
-    }
-
-    function bodyPreservesCycleOrder(body){
-      if(body.length < 2) return true;
-
-      const headIndex = cycleIndex.get(pointKey(body[0]));
-      if(headIndex === undefined) return false;
-
-      let previousDistance = 0;
-
-      for(let i=1;i<body.length;i++){
-        const idx = cycleIndex.get(pointKey(body[i]));
-        if(idx === undefined) return false;
-
-        const distance =
-          (headIndex - idx + cycle.length) % cycle.length;
-
-        if(distance <= previousDistance || distance === 0){
-          return false;
-        }
-
-        previousDistance = distance;
-      }
-
-      return true;
-    }
-
-    function bodyCanReachTail(body){
-      if(body.length < 3) return true;
-
-      const head = body[0];
-      const tail = body[body.length-1];
-      const blocked = new Set(
-        body.slice(1,-1).map(pointKey)
-      );
-
-      return bfsPath(head, tail, blocked, 0).length > 0;
-    }
-
-    function findShortestSafeFoodPath(){
-      if(!food) return [];
-
-      const blocked = new Set(
-        snake.slice(0,-1).map(pointKey)
-      );
-
-      let best = [];
-
-      for(let mode=0;mode<=6;mode++){
-        const candidate = bfsPath(
-          snake[0],
-          food,
-          blocked,
-          mode
-        );
-
-        if(!candidate.length) continue;
-
-        const simulated = simulateFoodPath(candidate);
-
-        if(!simulated) continue;
-        if(!bodyCanReachTail(simulated)) continue;
-        if(!bodyPreservesCycleOrder(simulated)) continue;
-
-        if(!best.length || candidate.length < best.length){
-          best = candidate;
-        }
-      }
-
-      return best;
-    }
-
     function chooseMove(){
       if(plannedPath.length){
         return plannedPath.shift();
       }
 
-      const direct = findShortestSafeFoodPath();
+      const direct = orderedPathTo(food);
 
       if(direct.length){
         plannedPath = direct;
@@ -507,9 +507,7 @@
 
       const head = snake[0];
       const hi = cycleIndex.get(pointKey(head));
-      const next = cycle[(hi+1)%cycle.length];
-
-      return {...next};
+      return {...cycle[(hi+1)%cycle.length]};
     }
 
     function same(a,b){
