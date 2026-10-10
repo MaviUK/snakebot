@@ -1,53 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <queries>
-        <package android:name="com.pranta.snakeclassic" />
-    </queries>
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:allowBackup="false"
-        android:label="@string/app_name"
-        android:theme="@style/AppTheme">
+        android:allowBackup="true"
+        android:label="SNAKE"
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="false">
 
         <activity
-            android:name=".CapturePermissionActivity"
-            android:theme="@style/CapturePermissionTheme"
-            android:excludeFromRecents="true"
-            android:exported="false" />
-
-        <activity
-            android:name=".CalibrationActivity"
-            android:screenOrientation="portrait"
-            android:exported="false" />
-
-        <activity
-            android:name=".MainActivity"
-            android:screenOrientation="portrait"
-            android:exported="true">
+            android:name="uk.co.snakebot.snake.MainActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="true"
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <service
-            android:name=".CaptureService"
-            android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
-
-        <service
-            android:name=".SnakeAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
     </application>
 </manifest>
