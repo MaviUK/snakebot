@@ -87,7 +87,7 @@
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">Food first • clean row routing • random hazards • closing at 85%</div>
+      <div class="tips">Safe completion • food first • random hazards • closing at 85%</div>
     </section>
   </main>
 
@@ -695,6 +695,22 @@
     function addOneBomb(){
       const occupied = occupiedHazardCells();
       const head = snake[0];
+      const headIndex = cycleIndex.get(pointKey(head));
+      const protectedForward = new Set();
+
+      if(headIndex !== undefined){
+        const protectedSteps = Math.min(
+          cycle.length-1,
+          BOMB_LIFETIME_STEPS + 10
+        );
+
+        for(let step=1;step<=protectedSteps;step++){
+          protectedForward.add(
+            pointKey(cycle[(headIndex+step)%cycle.length])
+          );
+        }
+      }
+
       const candidates = [];
 
       for(let y=0;y<ROWS-1;y++){
@@ -711,7 +727,8 @@
             return (
               cycleIndex.has(key) &&
               !obstacles.has(key) &&
-              !occupied.has(key)
+              !occupied.has(key) &&
+              !protectedForward.has(key)
             );
           });
 
@@ -1004,85 +1021,73 @@
       return [];
     }
 
-    function safeClosingMove(){
+    function moveWouldEat(p){
+      return foods.some(item=>same(item,p));
+    }
+
+    function moveIsSafe(p){
+      if(!p) return false;
+
+      const key = pointKey(p);
+      if(obstacles.has(key)) return false;
+      if(isBombCell(p)) return false;
+
+      const willEat = moveWouldEat(p);
+      const body = willEat
+        ? snake
+        : snake.slice(0,-1);
+
+      return !body.some(segment=>same(segment,p));
+    }
+
+    function safestAvailableMove(){
       const head = snake[0];
       const headIndex = cycleIndex.get(pointKey(head));
-      const immediate =
-        cycle[(headIndex+1)%cycle.length];
 
-      if(!isBombCell(immediate)){
-        return {...immediate};
-      }
-
-      const tail = snake[snake.length-1];
-      const tailIndex = cycleIndex.get(pointKey(tail));
-      const tailGap = forwardDistance(headIndex,tailIndex);
-      const bodyBlocked = new Set(
-        snake.slice(0,-1).map(pointKey)
-      );
-
-      const alternatives = gridNeighbors(head)
-        .filter(next=>{
-          const key = pointKey(next);
-          const idx = cycleIndex.get(key);
-
-          if(idx === undefined) return false;
-          if(obstacles.has(key)) return false;
-          if(isBombCell(next)) return false;
-          if(bodyBlocked.has(key)) return false;
-
-          const advance =
-            forwardDistance(headIndex,idx);
-
-          return (
-            advance > 0 &&
-            advance < tailGap
-          );
-        })
+      const candidates = gridNeighbors(head)
+        .filter(moveIsSafe)
         .sort((a,b)=>{
           const ai = cycleIndex.get(pointKey(a));
           const bi = cycleIndex.get(pointKey(b));
 
-          return (
-            forwardDistance(headIndex,ai) -
-            forwardDistance(headIndex,bi)
-          );
+          const ad = ai === undefined
+            ? Number.MAX_SAFE_INTEGER
+            : forwardDistance(headIndex,ai);
+
+          const bd = bi === undefined
+            ? Number.MAX_SAFE_INTEGER
+            : forwardDistance(headIndex,bi);
+
+          return ad-bd;
         });
 
-      if(alternatives.length){
-        return alternatives[0];
+      return candidates.length
+        ? {...candidates[0]}
+        : null;
+    }
+
+    function safeClosingMove(){
+      const head = snake[0];
+      const headIndex = cycleIndex.get(pointKey(head));
+
+      if(headIndex === undefined){
+        return safestAvailableMove();
       }
 
-      for(let advance=2;advance<=48;advance++){
-        const target =
-          cycle[(headIndex+advance)%cycle.length];
+      const immediate =
+        cycle[(headIndex+1)%cycle.length];
 
-        if(isBombCell(target)) continue;
-
-        const path = orderedPathTo(target);
-
-        if(path.length){
-          return path[0];
-        }
+      if(moveIsSafe(immediate)){
+        return {...immediate};
       }
 
-      const emergency = gridNeighbors(head)
-        .filter(next=>{
-          const key = pointKey(next);
+      const fallback = safestAvailableMove();
 
-          return (
-            cycleIndex.has(key) &&
-            !obstacles.has(key) &&
-            !isBombCell(next) &&
-            !bodyBlocked.has(key)
-          );
-        });
-
-      if(emergency.length){
-        return emergency[0];
+      if(fallback){
+        return fallback;
       }
 
-      return {...immediate};
+      return null;
     }
 
     function chooseMove(){
@@ -1094,45 +1099,56 @@
 
       chooseFoodTarget();
 
+      const conservativeMode =
+        fillRatio >= 0.45;
+
+      if(conservativeMode){
+        return safeClosingMove();
+      }
+
       const foodPath = food
         ? orderedPathTo(food)
         : [];
 
       const bonusChoice = nearestBonusPath();
-      const bonusLimit =
-        closingMode ? 4 : BONUS_MAX_CHASE_STEPS;
 
       const bonusIsWorthDetour =
         bonusChoice &&
         bonusChoice.path.length > 0 &&
-        bonusChoice.path.length <= bonusLimit &&
+        bonusChoice.path.length <= BONUS_MAX_CHASE_STEPS &&
         (
           !foodPath.length ||
           bonusChoice.path.length <=
             foodPath.length + BONUS_EXTRA_DETOUR_STEPS
         );
 
-      if(bonusIsWorthDetour){
+      if(
+        bonusIsWorthDetour &&
+        moveIsSafe(bonusChoice.path[0])
+      ){
         return bonusChoice.path[0];
       }
 
-      if(closingMode){
-        return safeClosingMove();
-      }
-
-      if(foodPath.length){
+      if(
+        foodPath.length &&
+        moveIsSafe(foodPath[0])
+      ){
         return foodPath[0];
       }
 
       const head = snake[0];
       const hi = cycleIndex.get(pointKey(head));
-      const next = cycle[(hi+1)%cycle.length];
 
-      if(isBombCell(next)){
-        return safeClosingMove();
+      if(hi !== undefined){
+        const next =
+          cycle[(hi+1)%cycle.length];
+
+        if(moveIsSafe(next)){
+          return {...next};
+        }
       }
 
-      return {...next};
+      return safestAvailableMove();
     }
 
     function directionName(from,to){
@@ -1167,7 +1183,17 @@
 
       if(!running || transitioning) return;
 
-      const next = chooseMove();
+      let next = chooseMove();
+
+      if(!moveIsSafe(next)){
+        next = safestAvailableMove();
+      }
+
+      if(!next){
+        recoverLevel();
+        return;
+      }
+
       showDirection(
         directionName(snake[0],next)
       );
@@ -1181,8 +1207,14 @@
       const blockedBody = new Set((willEat ? snake : snake.slice(0,-1)).map(pointKey));
 
       if(blockedBody.has(pointKey(next)) || obstacles.has(pointKey(next))){
-        recoverLevel();
-        return;
+        const emergency = safestAvailableMove();
+
+        if(emergency && !same(emergency,next)){
+          next = emergency;
+        }else{
+          recoverLevel();
+          return;
+        }
       }
 
       snake.unshift(next);
@@ -1226,7 +1258,7 @@
 
         if(ateActiveTarget){
           food = null;
-            }
+        }
 
         foodCount++;
         points += level * (doublePointsSteps > 0 ? 2 : 1);
