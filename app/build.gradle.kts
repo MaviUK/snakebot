@@ -4,15 +4,15 @@ plugins {
 }
 
 android {
-    namespace = "uk.co.snakebot.autoplayer"
+    namespace = "uk.co.snakebot.snake"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "uk.co.snakebot.autoplayer"
+        applicationId = "uk.co.snakebot.snake"
         minSdk = 30
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.1.7"
+        versionCode = 9
+        versionName = "1.0.0"
     }
 
     buildTypes {
