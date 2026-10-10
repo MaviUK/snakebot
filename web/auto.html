@@ -87,7 +87,7 @@
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">Closing lines at 85% • 2×2 timed bombs • bonuses from level 10</div>
+      <div class="tips">Avoid bombs • chase bonuses • closing lines at 85%</div>
     </section>
   </main>
 
@@ -474,6 +474,10 @@
       );
     }
 
+    function isBombCell(p){
+      return bombs.some(bomb=>bombContains(bomb,p));
+    }
+
     function bombShrinkAmount(){
       return Math.min(
         20,
@@ -827,7 +831,7 @@
     }
 
     function nearestBonusPath(){
-      if(closingMode || !bonuses.length) return null;
+      if(!bonuses.length) return null;
 
       let best = null;
 
@@ -908,6 +912,7 @@
 
             if(ni === undefined) return false;
             if(previous.has(nk)) return false;
+            if(isBombCell(next)) return false;
 
             const advance = forwardDistance(headIndex, ni);
 
@@ -939,6 +944,73 @@
       return [];
     }
 
+    function safeClosingMove(){
+      const head = snake[0];
+      const headIndex = cycleIndex.get(pointKey(head));
+      const immediate =
+        cycle[(headIndex+1)%cycle.length];
+
+      if(!isBombCell(immediate)){
+        return {...immediate};
+      }
+
+      const tail = snake[snake.length-1];
+      const tailIndex = cycleIndex.get(pointKey(tail));
+      const tailGap = forwardDistance(headIndex,tailIndex);
+      const bodyBlocked = new Set(
+        snake.slice(0,-1).map(pointKey)
+      );
+
+      const alternatives = gridNeighbors(head)
+        .filter(next=>{
+          const key = pointKey(next);
+          const idx = cycleIndex.get(key);
+
+          if(idx === undefined) return false;
+          if(obstacles.has(key)) return false;
+          if(isBombCell(next)) return false;
+          if(bodyBlocked.has(key)) return false;
+
+          const advance =
+            forwardDistance(headIndex,idx);
+
+          return (
+            advance > 0 &&
+            advance < tailGap
+          );
+        })
+        .sort((a,b)=>{
+          const ai = cycleIndex.get(pointKey(a));
+          const bi = cycleIndex.get(pointKey(b));
+
+          return (
+            forwardDistance(headIndex,ai) -
+            forwardDistance(headIndex,bi)
+          );
+        });
+
+      if(alternatives.length){
+        plannedPath = [];
+        return alternatives[0];
+      }
+
+      for(let advance=2;advance<=48;advance++){
+        const target =
+          cycle[(headIndex+advance)%cycle.length];
+
+        if(isBombCell(target)) continue;
+
+        const path = orderedPathTo(target);
+
+        if(path.length){
+          plannedPath = path.slice(1);
+          return path[0];
+        }
+      }
+
+      return {...immediate};
+    }
+
     function chooseMove(){
       const fillRatio = snake.length / cycle.length;
 
@@ -946,30 +1018,23 @@
         activateClosingMode();
       }
 
-      if(closingMode){
-        const head = snake[0];
-        const hi = cycleIndex.get(pointKey(head));
-        return {...cycle[(hi+1)%cycle.length]};
-      }
-
       const bonusChoice = nearestBonusPath();
 
-      if(bonusChoice){
-        const currentFoodPath = food
-          ? orderedPathTo(food)
-          : [];
+      if(bonusChoice && bonusChoice.path.length){
+        plannedPath = bonusChoice.path.slice(1);
+        return bonusChoice.path[0];
+      }
 
-        if(
-          !currentFoodPath.length ||
-          bonusChoice.path.length <= currentFoodPath.length + 8
-        ){
-          plannedPath = [];
-          return bonusChoice.path[0];
-        }
+      if(closingMode){
+        return safeClosingMove();
       }
 
       if(plannedPath.length){
-        return plannedPath.shift();
+        if(isBombCell(plannedPath[0])){
+          plannedPath = [];
+        }else{
+          return plannedPath.shift();
+        }
       }
 
       chooseFoodTarget();
@@ -983,7 +1048,13 @@
 
       const head = snake[0];
       const hi = cycleIndex.get(pointKey(head));
-      return {...cycle[(hi+1)%cycle.length]};
+      const next = cycle[(hi+1)%cycle.length];
+
+      if(isBombCell(next)){
+        return safeClosingMove();
+      }
+
+      return {...next};
     }
 
     function directionName(from,to){
