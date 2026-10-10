@@ -84,7 +84,7 @@
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">More food each level • line closing after 70% • obstacles from level 6</div>
+      <div class="tips">More food each level • obstacles from level 6 • bombs from level 8</div>
     </section>
   </main>
 
@@ -144,6 +144,7 @@
     let snake = [];
     let foods = [];
     let food = null;
+    let bombs = [];
     let obstacles = new Set();
     let cycle = [];
     let cycleIndex = new Map();
@@ -154,6 +155,8 @@
     let audioCtx = null;
     let foodCount = 0;
     let points = 0;
+    let hazardMessage = '';
+    let hazardMessageUntil = 0;
     let currentDirection = null;
     let plannedPath = [];
     let closingMode = false;
@@ -425,6 +428,22 @@
       return Math.min(5, Math.max(1, level));
     }
 
+    function bombTargetCount(){
+      if(level < 8) return 0;
+      return Math.min(4, 1 + Math.floor((level - 8) / 2));
+    }
+
+    function bombShrinkAmount(){
+      return Math.min(
+        20,
+        8 + Math.floor(Math.max(0, level - 8) / 2) * 2
+      );
+    }
+
+    function bombPointPenalty(){
+      return level * 10;
+    }
+
     function activateClosingMode(){
       if(closingMode) return;
       closingMode = true;
@@ -439,7 +458,8 @@
     function buildFoodCandidates(){
       const occupied = new Set([
         ...snake.map(pointKey),
-        ...foods.map(pointKey)
+        ...foods.map(pointKey),
+        ...bombs.map(pointKey)
       ]);
       const head = snake[0];
       const tail = snake[snake.length-1];
@@ -492,7 +512,8 @@
       if(!candidates.length){
         const occupied = new Set([
           ...snake.map(pointKey),
-          ...foods.map(pointKey)
+          ...foods.map(pointKey),
+          ...bombs.map(pointKey)
         ]);
 
         const anyFree = cycle.filter(
@@ -591,8 +612,50 @@
       plannedPath = [];
     }
 
+    function addOneBomb(){
+      const occupied = new Set([
+        ...snake.map(pointKey),
+        ...foods.map(pointKey),
+        ...bombs.map(pointKey)
+      ]);
+
+      const head = snake[0];
+      const candidates = cycle.filter(p=>{
+        const pk = pointKey(p);
+        if(occupied.has(pk)) return false;
+        if(obstacles.has(pk)) return false;
+
+        const distance =
+          Math.abs(p.x-head.x) +
+          Math.abs(p.y-head.y);
+
+        return distance >= 6;
+      });
+
+      if(!candidates.length) return false;
+
+      bombs.push({
+        ...candidates[Math.floor(Math.random()*candidates.length)]
+      });
+
+      return true;
+    }
+
+    function ensureBombCount(){
+      const target = bombTargetCount();
+
+      while(bombs.length < target){
+        if(!addOneBomb()) break;
+      }
+
+      if(bombs.length > target){
+        bombs = bombs.slice(0,target);
+      }
+    }
+
     function spawnFood(){
       ensureFoodCount();
+      ensureBombCount();
     }
 
     function orderedPathTo(target){
@@ -753,7 +816,10 @@
         directionName(snake[0],next)
       );
       const eatenIndex = foods.findIndex(f=>same(next,f));
+      const bombIndex = bombs.findIndex(b=>same(next,b));
       const willEat = eatenIndex >= 0;
+      const hitBomb = bombIndex >= 0;
+      const oldLength = snake.length;
       const blockedBody = new Set((willEat ? snake : snake.slice(0,-1)).map(pointKey));
 
       if(blockedBody.has(pointKey(next)) || obstacles.has(pointKey(next))){
@@ -767,7 +833,30 @@
         closureSteps++;
       }
 
-      if(willEat){
+      if(hitBomb){
+        bombs.splice(bombIndex,1);
+
+        const shrinkBy = Math.min(
+          bombShrinkAmount(),
+          Math.max(0, oldLength - 5)
+        );
+        const penalty = Math.min(points,bombPointPenalty());
+        const targetLength = Math.max(5, oldLength - shrinkBy);
+
+        snake.length = Math.min(snake.length,targetLength);
+        points = Math.max(0,points - penalty);
+        plannedPath = [];
+
+        hazardMessage =
+          'BOMB! -' + penalty + ' PTS • -' + shrinkBy + ' LENGTH';
+        hazardMessageUntil = Date.now() + 1100;
+
+        beep(180,0.12);
+        setTimeout(()=>beep(130,0.12),90);
+
+        ensureBombCount();
+        chooseFoodTarget();
+      }else if(willEat){
         foods.splice(eatenIndex,1);
         foodCount++;
         points += level;
@@ -815,6 +904,9 @@
       foodCount = 0;
       foods = [];
       food = null;
+      bombs = [];
+      hazardMessage = '';
+      hazardMessageUntil = 0;
       currentDirection = null;
       showDirection(null);
       plannedPath = [];
@@ -849,6 +941,7 @@
       clearTimeout(timer);
       foods = [];
       food = null;
+      bombs = [];
 
       beep(900,.08);
       setTimeout(()=>beep(1080,.1),100);
@@ -896,6 +989,11 @@
 
       const fillRatio = snake.length / total;
 
+      if(Date.now() < hazardMessageUntil){
+        statusEl.textContent = hazardMessage;
+        return;
+      }
+
       if(closingMode){
         const straightened = closureSteps >= snake.length;
 
@@ -909,11 +1007,14 @@
                 : 'STRAIGHTENING LINES');
       }else{
         const foodLabel = foods.length + ' FOOD';
+        const bombLabel = bombs.length
+          ? ' • ' + bombs.length + ' BOMB' + (bombs.length === 1 ? '' : 'S')
+          : '';
 
         statusEl.textContent =
           obstacleCells
-            ? 'AUTO HUNT • ' + foodLabel + ' • OBSTACLES'
-            : 'AUTO HUNT • ' + foodLabel;
+            ? 'AUTO HUNT • ' + foodLabel + bombLabel + ' • OBSTACLES'
+            : 'AUTO HUNT • ' + foodLabel + bombLabel;
       }
     }
 
@@ -975,6 +1076,22 @@
       }
     }
 
+    function drawBombs(){
+      for(const bomb of bombs){
+        const px=bomb.x*CELL;
+        const py=bomb.y*CELL;
+
+        ctx.fillStyle=PIXEL;
+        ctx.fillRect(px+2,py+2,4,4);
+        ctx.fillRect(px+1,py+3,6,2);
+        ctx.fillRect(px+3,py+1,2,6);
+        ctx.fillRect(px+5,py,2,2);
+
+        ctx.fillStyle=LCD;
+        ctx.fillRect(px+3,py+3,2,2);
+      }
+    }
+
     function draw(){
       ctx.fillStyle=LCD;
       ctx.fillRect(0,0,W,H);
@@ -987,6 +1104,7 @@
       }
 
       drawFood();
+      drawBombs();
 
       for(let i=snake.length-1;i>=0;i--){
         drawSnakePixel(snake[i],i===0);
