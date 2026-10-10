@@ -84,7 +84,7 @@
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">Food hunting • line closing after 70% • obstacle levels • automatic next level</div>
+      <div class="tips">More food each level • line closing after 70% • obstacles from level 6</div>
     </section>
   </main>
 
@@ -142,6 +142,7 @@
 
     let level = 1;
     let snake = [];
+    let foods = [];
     let food = null;
     let obstacles = new Set();
     let cycle = [];
@@ -201,9 +202,9 @@
 
     function obstacleMacrosForLevel(){
       const blocked = new Set();
-      if(level < 4) return blocked;
+      if(level < 6) return blocked;
 
-      const stages = Math.min(OBSTACLE_GROUPS.length, level - 3);
+      const stages = Math.min(OBSTACLE_GROUPS.length, level - 5);
 
       for(let i=0;i<stages;i++){
         for(const [x,y] of OBSTACLE_GROUPS[i]){
@@ -415,9 +416,13 @@
       if(fillRatio >= 0.94) return 10;
       if(fillRatio >= 0.86) return 20;
       if(fillRatio >= 0.75) return 34;
-      if(fillRatio >= 0.64) return 56;
-      if(fillRatio >= 0.70) return 88;
+      if(fillRatio >= 0.70) return 56;
       return Infinity;
+    }
+
+    function foodTargetCount(){
+      if(closingMode) return 1;
+      return Math.min(5, Math.max(1, level));
     }
 
     function activateClosingMode(){
@@ -425,12 +430,17 @@
       closingMode = true;
       closureSteps = 0;
       plannedPath = [];
+
+      if(foods.length > 1){
+        foods = food ? [food] : [foods[0]];
+      }
     }
 
-    function spawnFood(){
-      plannedPath = [];
-
-      const occupied = new Set(snake.map(pointKey));
+    function buildFoodCandidates(){
+      const occupied = new Set([
+        ...snake.map(pointKey),
+        ...foods.map(pointKey)
+      ]);
       const head = snake[0];
       const tail = snake[snake.length-1];
       const headIndex = cycleIndex.get(pointKey(head));
@@ -464,24 +474,6 @@
         }))
         .sort((a,b)=>a.advance-b.advance);
 
-      if(!safeFree.length){
-        const anyFree = cycle.filter(
-          p=>!occupied.has(pointKey(p))
-        );
-
-        if(!anyFree.length){
-          food = null;
-          completeLevel();
-          return;
-        }
-
-        const fallback =
-          anyFree[Math.floor(Math.random()*anyFree.length)];
-
-        food = {...fallback};
-        return;
-      }
-
       const windowSize = closureWindowSize(fillRatio);
 
       if(Number.isFinite(windowSize)){
@@ -491,85 +483,116 @@
         );
       }
 
-      if(closingMode){
-        let pool = safeFree;
+      return safeFree;
+    }
 
-        if(pool.length > 8){
-          const withoutImmediate = pool.filter(item=>item.advance >= 4);
-          if(withoutImmediate.length >= 4){
-            pool = withoutImmediate;
-          }
+    function addOneFood(){
+      const candidates = buildFoodCandidates();
+
+      if(!candidates.length){
+        const occupied = new Set([
+          ...snake.map(pointKey),
+          ...foods.map(pointKey)
+        ]);
+
+        const anyFree = cycle.filter(
+          p=>!occupied.has(pointKey(p))
+        );
+
+        if(!anyFree.length){
+          return false;
         }
 
-        const pick = pool[
-          Math.floor(Math.random()*pool.length)
-        ];
+        foods.push({
+          ...anyFree[Math.floor(Math.random()*anyFree.length)]
+        });
+        return true;
+      }
 
-        food = {...pick.p};
+      let pool = candidates;
+
+      if(pool.length > 8){
+        const notImmediate = pool.filter(item=>item.advance >= 3);
+
+        if(notImmediate.length >= 3){
+          pool = notImmediate;
+        }
+      }
+
+      const pick = pool[Math.floor(Math.random()*pool.length)];
+      foods.push({...pick.p});
+      return true;
+    }
+
+    function ensureFoodCount(){
+      const target = foodTargetCount();
+
+      while(foods.length < target){
+        if(!addOneFood()) break;
+      }
+
+      if(!foods.length){
+        food = null;
+        completeLevel();
+        return;
+      }
+
+      chooseFoodTarget();
+    }
+
+    function chooseFoodTarget(){
+      if(!foods.length){
+        food = null;
+        return;
+      }
+
+      if(closingMode){
+        const headIndex = cycleIndex.get(pointKey(snake[0]));
+
+        foods.sort((a,b)=>{
+          const ai = cycleIndex.get(pointKey(a));
+          const bi = cycleIndex.get(pointKey(b));
+
+          return (
+            forwardDistance(headIndex,ai) -
+            forwardDistance(headIndex,bi)
+          );
+        });
+
+        food = foods[0];
         plannedPath = [];
         return;
       }
 
-      const viable = [];
+      let best = null;
 
-      for(const item of safeFree){
-        const candidate = item.p;
+      for(const candidate of foods){
         const path = orderedPathTo(candidate);
-
         if(!path.length) continue;
 
-        const manhattan =
-          Math.abs(head.x-candidate.x) +
-          Math.abs(head.y-candidate.y);
+        const distance = path.length;
 
-        const detourRatio =
-          path.length / Math.max(1,manhattan);
-
-        viable.push({
-          candidate,
-          path,
-          detourRatio,
-          advance:item.advance
-        });
+        if(!best || distance < best.distance){
+          best = {
+            candidate,
+            path,
+            distance
+          };
+        }
       }
 
-      if(viable.length){
-        const directish = viable.filter(v=>
-          v.detourRatio <= (
-            fillRatio >= 0.84 ? 1.8 :
-            fillRatio >= 0.64 ? 1.65 :
-            1.5
-          )
-        );
-
-        let pool = directish.length
-          ? directish
-          : viable
-              .slice()
-              .sort((a,b)=>a.detourRatio-b.detourRatio)
-              .slice(0,Math.min(12,viable.length));
-
-        if(pool.length >= 4){
-          const notRightInFront =
-            pool.filter(v=>v.path.length >= 3);
-
-          if(notRightInFront.length >= 2){
-            pool = notRightInFront;
-          }
-        }
-
-        const pick =
-          pool[Math.floor(Math.random()*pool.length)];
-
-        food = {...pick.candidate};
-        plannedPath = pick.path.slice();
+      if(best){
+        food = best.candidate;
+        plannedPath = best.path.slice();
         return;
       }
 
-      const fallback =
-        safeFree[Math.floor(Math.random()*safeFree.length)].p;
+      food = foods[0];
+      plannedPath = [];
+    }
 
-      food = {...fallback};
+    function spawnFood(){
+      ensureFoodCount();
     }
 
     function orderedPathTo(target){
@@ -679,6 +702,8 @@
         return plannedPath.shift();
       }
 
+      chooseFoodTarget();
+
       const direct = orderedPathTo(food);
 
       if(direct.length){
@@ -727,7 +752,8 @@
       showDirection(
         directionName(snake[0],next)
       );
-      const willEat = same(next,food);
+      const eatenIndex = foods.findIndex(f=>same(next,f));
+      const willEat = eatenIndex >= 0;
       const blockedBody = new Set((willEat ? snake : snake.slice(0,-1)).map(pointKey));
 
       if(blockedBody.has(pointKey(next)) || obstacles.has(pointKey(next))){
@@ -742,6 +768,7 @@
       }
 
       if(willEat){
+        foods.splice(eatenIndex,1);
         foodCount++;
         points += level;
         beep(720,0.03);
@@ -753,7 +780,7 @@
           return;
         }
 
-        spawnFood();
+        ensureFoodCount();
       }else{
         snake.pop();
       }
@@ -786,6 +813,8 @@
       transitioning = false;
       running = true;
       foodCount = 0;
+      foods = [];
+      food = null;
       currentDirection = null;
       showDirection(null);
       plannedPath = [];
@@ -818,6 +847,7 @@
       transitioning = true;
       running = false;
       clearTimeout(timer);
+      foods = [];
       food = null;
 
       beep(900,.08);
@@ -878,10 +908,12 @@
                 ? 'STRAIGHTENING • OBSTACLES'
                 : 'STRAIGHTENING LINES');
       }else{
+        const foodLabel = foods.length + ' FOOD';
+
         statusEl.textContent =
           obstacleCells
-            ? 'AUTO HUNT • OBSTACLES'
-            : 'AUTO HUNT';
+            ? 'AUTO HUNT • ' + foodLabel + ' • OBSTACLES'
+            : 'AUTO HUNT • ' + foodLabel;
       }
     }
 
@@ -930,17 +962,17 @@
     }
 
     function drawFood(){
-      if(!food) return;
+      for(const item of foods){
+        const px=item.x*CELL;
+        const py=item.y*CELL;
 
-      const px=food.x*CELL;
-      const py=food.y*CELL;
+        ctx.fillStyle=PIXEL;
+        ctx.fillRect(px+2,py+1,4,6);
+        ctx.fillRect(px+1,py+2,6,4);
 
-      ctx.fillStyle=PIXEL;
-      ctx.fillRect(px+2,py+1,4,6);
-      ctx.fillRect(px+1,py+2,6,4);
-
-      ctx.fillStyle=LCD;
-      ctx.fillRect(px+3,py+3,2,2);
+        ctx.fillStyle=LCD;
+        ctx.fillRect(px+3,py+3,2,2);
+      }
     }
 
     function draw(){
