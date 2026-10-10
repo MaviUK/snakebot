@@ -167,7 +167,6 @@
     let hazardMessage = '';
     let hazardMessageUntil = 0;
     let currentDirection = null;
-    let plannedPath = [];
     let closingMode = false;
     let closureSteps = 0;
     const TEST_SPEEDS = [1,2,4,8];
@@ -185,24 +184,6 @@
     function parseCellKey(k){
       const parts = k.split(',');
       return {x:Number(parts[0]), y:Number(parts[1])};
-    }
-
-    function seededRandom(seed){
-      let s = seed >>> 0;
-      return () => {
-        s ^= s << 13;
-        s ^= s >>> 17;
-        s ^= s << 5;
-        return ((s >>> 0) / 4294967296);
-      };
-    }
-
-    function shuffle(arr, rnd){
-      for(let i=arr.length-1;i>0;i--){
-        const j = Math.floor(rnd() * (i+1));
-        [arr[i],arr[j]]=[arr[j],arr[i]];
-      }
-      return arr;
     }
 
     function levelDelay(){
@@ -536,7 +517,6 @@
       if(closingMode) return;
       closingMode = true;
       closureSteps = 0;
-      plannedPath = [];
 
       chooseFoodTarget();
       ensureFoodCount();
@@ -894,7 +874,6 @@
 
       scheduleNextBonus();
       hazardMessageUntil = Date.now() + 1200;
-      plannedPath = [];
       beep(980,0.06);
       setTimeout(()=>beep(1220,0.08),70);
     }
@@ -1224,8 +1203,7 @@
 
         snake.length = Math.min(snake.length,targetLength);
         points = Math.max(0,points - penalty);
-        plannedPath = [];
-
+  
         hazardMessage =
           'BOMB! -' + penalty + ' PTS • -' + shrinkBy + ' LENGTH';
         hazardMessageUntil = Date.now() + 1100;
@@ -1248,8 +1226,7 @@
 
         if(ateActiveTarget){
           food = null;
-          plannedPath = [];
-        }
+            }
 
         foodCount++;
         points += level * (doublePointsSteps > 0 ? 2 : 1);
@@ -1310,7 +1287,6 @@
       hazardMessageUntil = 0;
       currentDirection = null;
       showDirection(null);
-      plannedPath = [];
       closingMode = false;
       closureSteps = 0;
 
