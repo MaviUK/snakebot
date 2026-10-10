@@ -60,7 +60,7 @@
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">Food hunting • line closing after 55% • obstacle levels • automatic next level</div>
+      <div class="tips">Food hunting • line closing after 70% • obstacle levels • automatic next level</div>
     </section>
   </main>
 
@@ -384,7 +384,7 @@
       if(fillRatio >= 0.86) return 20;
       if(fillRatio >= 0.75) return 34;
       if(fillRatio >= 0.64) return 56;
-      if(fillRatio >= 0.55) return 88;
+      if(fillRatio >= 0.70) return 88;
       return Infinity;
     }
 
@@ -633,7 +633,7 @@
     function chooseMove(){
       const fillRatio = snake.length / cycle.length;
 
-      if(!closingMode && fillRatio >= 0.55){
+      if(!closingMode && fillRatio >= 0.70){
         activateClosingMode();
       }
 
