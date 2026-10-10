@@ -8,7 +8,7 @@
         android:usesCleartextTraffic="false">
 
         <activity
-            android:name="uk.co.snakebot.snake.MainActivity"
+            android:name="uk.co.snakebot.autoplayer.MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="true"
             android:screenOrientation="portrait">
