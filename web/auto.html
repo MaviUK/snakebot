@@ -1040,13 +1040,55 @@
       return !body.some(segment=>same(segment,p));
     }
 
+    function moveKeepsEscape(p){
+      if(!moveIsSafe(p)) return false;
+
+      const willEat = moveWouldEat(p);
+      const simulated = [
+        {...p},
+        ...snake.map(segment=>({...segment}))
+      ];
+
+      if(!willEat){
+        simulated.pop();
+      }
+
+      const blocked = new Set(
+        simulated.slice(0,-1).map(pointKey)
+      );
+
+      return gridNeighbors(p).some(next=>{
+        const key = pointKey(next);
+
+        if(obstacles.has(key)) return false;
+        if(isBombCell(next)) return false;
+
+        const nextWillEat =
+          foods.some(item=>same(item,next));
+
+        if(nextWillEat){
+          return !simulated.some(
+            segment=>same(segment,next)
+          );
+        }
+
+        return !blocked.has(key);
+      });
+    }
+
     function safestAvailableMove(){
       const head = snake[0];
       const headIndex = cycleIndex.get(pointKey(head));
 
-      const candidates = gridNeighbors(head)
-        .filter(moveIsSafe)
-        .sort((a,b)=>{
+      let candidates = gridNeighbors(head)
+        .filter(moveKeepsEscape);
+
+      if(!candidates.length){
+        candidates = gridNeighbors(head)
+          .filter(moveIsSafe);
+      }
+
+      candidates.sort((a,b)=>{
           const ai = cycleIndex.get(pointKey(a));
           const bi = cycleIndex.get(pointKey(b));
 
@@ -1100,7 +1142,7 @@
       chooseFoodTarget();
 
       const conservativeMode =
-        fillRatio >= 0.45;
+        fillRatio >= 0.35;
 
       if(conservativeMode){
         return safeClosingMove();
@@ -1124,14 +1166,14 @@
 
       if(
         bonusIsWorthDetour &&
-        moveIsSafe(bonusChoice.path[0])
+        moveKeepsEscape(bonusChoice.path[0])
       ){
         return bonusChoice.path[0];
       }
 
       if(
         foodPath.length &&
-        moveIsSafe(foodPath[0])
+        moveKeepsEscape(foodPath[0])
       ){
         return foodPath[0];
       }
@@ -1207,14 +1249,8 @@
       const blockedBody = new Set((willEat ? snake : snake.slice(0,-1)).map(pointKey));
 
       if(blockedBody.has(pointKey(next)) || obstacles.has(pointKey(next))){
-        const emergency = safestAvailableMove();
-
-        if(emergency && !same(emergency,next)){
-          next = emergency;
-        }else{
-          recoverLevel();
-          return;
-        }
+        recoverLevel();
+        return;
       }
 
       snake.unshift(next);
