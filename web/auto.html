@@ -18,14 +18,15 @@
     .brand{display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:12px;color:#e8f0e8;font-weight:800;letter-spacing:.19em;font-size:13px;text-shadow:0 1px #000}
     .speaker{width:38px;height:5px;border-radius:999px;background:#122e29;box-shadow:inset 0 1px 1px #0008}
     .screen-shell{background:var(--screen-edge);padding:12px;border-radius:14px 14px 28px 28px;box-shadow:inset 0 0 12px #000b,0 2px 1px #9bb7af44}
-    .screen{position:relative;aspect-ratio:1/1;overflow:hidden;background:var(--screen);border:3px solid #566846;box-shadow:inset 0 0 22px #4f603c55;image-rendering:pixelated}
+    .screen{overflow:hidden;background:var(--screen);border:3px solid #566846;box-shadow:inset 0 0 22px #4f603c55;image-rendering:pixelated}
+    .screen-hud{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 8px 6px;border-bottom:2px solid #566846;color:var(--pixel);font-family:monospace;font-weight:900;font-size:11px;letter-spacing:.02em;pointer-events:none;text-shadow:0 1px #c7d29a66}
+    .screen-hud span{padding:1px 2px}
+    .board-area{position:relative;aspect-ratio:1/1;overflow:hidden}
     canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
     .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#9cad6cee;color:var(--pixel);font-family:monospace;font-weight:900;text-align:center;padding:20px;z-index:2}
     .overlay.hidden{display:none}
     .overlay .big{font-size:22px;letter-spacing:.05em;margin-bottom:8px}
     .overlay .small{font-size:12px;line-height:1.45}
-    .screen-hud{position:absolute;left:7px;right:7px;top:5px;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--pixel);font-family:monospace;font-weight:900;font-size:11px;letter-spacing:.02em;pointer-events:none;text-shadow:0 1px #c7d29a66}
-    .screen-hud span{background:#9cad6ccc;padding:2px 4px;border-radius:2px}
     .status{text-align:center;min-height:18px;margin-top:7px;font-family:monospace;font-size:12px;color:#dce7dc;font-weight:800}
     .direction-wrap{display:flex;justify-content:center;padding-top:15px}
     .direction-pad{position:relative;width:164px;height:122px}
@@ -53,12 +54,14 @@
     <section class="phone" aria-label="Nokia-style automatic Snake game">
       <div class="brand"><span class="speaker"></span><span>SNAKE AUTO 3310</span><span class="speaker"></span></div>
       <div class="screen-shell"><div class="screen">
-        <canvas id="game" width="240" height="240" aria-label="Automatic Snake game"></canvas>
         <div class="screen-hud" aria-label="Game score">
           <span id="screenLevel">LEVEL 01</span>
           <span id="screenPoints">POINTS 000000</span>
         </div>
-        <div id="overlay" class="overlay hidden"><div><div class="big">LEVEL 1</div><div class="small">AUTO PLAY</div></div></div>
+        <div class="board-area">
+          <canvas id="game" width="240" height="240" aria-label="Automatic Snake game"></canvas>
+          <div id="overlay" class="overlay hidden"><div><div class="big">LEVEL 1</div><div class="small">AUTO PLAY</div></div></div>
+        </div>
       </div></div>
 
       <div id="status" class="status">AUTO HUNT</div>
