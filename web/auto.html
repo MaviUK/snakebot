@@ -120,6 +120,7 @@
     let soundOn = false;
     let audioCtx = null;
     let foodCount = 0;
+    let plannedPath = [];
 
     function cellKey(x, y){ return x + ',' + y; }
     function pointKey(p){ return cellKey(p.x, p.y); }
@@ -326,6 +327,7 @@
     }
 
     function spawnFood(){
+      plannedPath = [];
       const occupied = new Set(snake.map(pointKey));
       const free = cycle.filter(p=>!occupied.has(pointKey(p)));
 
@@ -338,7 +340,7 @@
       food = {...free[Math.floor(Math.random()*free.length)]};
     }
 
-    function bfsPath(start, target, blocked){
+    function bfsPath(start, target, blocked, mode=0){
       const startKey = pointKey(start);
       const targetKey = pointKey(target);
       const queue = [start];
@@ -362,7 +364,25 @@
           return path;
         }
 
-        for(const next of gridNeighbors(current)){
+        const neighbors = gridNeighbors(current);
+
+        neighbors.sort((a,b)=>{
+          const da = Math.abs(a.x-target.x) + Math.abs(a.y-target.y);
+          const db = Math.abs(b.x-target.x) + Math.abs(b.y-target.y);
+
+          if(da !== db) return da-db;
+
+          if(mode === 1) return Math.abs(a.x-target.x)-Math.abs(b.x-target.x);
+          if(mode === 2) return Math.abs(a.y-target.y)-Math.abs(b.y-target.y);
+          if(mode === 3) return a.x-b.x || a.y-b.y;
+          if(mode === 4) return b.x-a.x || b.y-a.y;
+          if(mode === 5) return a.y-b.y || a.x-b.x;
+          if(mode === 6) return b.y-a.y || b.x-a.x;
+
+          return 0;
+        });
+
+        for(const next of neighbors){
           const nk = pointKey(next);
 
           if(previous.has(nk)) continue;
@@ -403,6 +423,31 @@
       return body;
     }
 
+    function bodyPreservesCycleOrder(body){
+      if(body.length < 2) return true;
+
+      const headIndex = cycleIndex.get(pointKey(body[0]));
+      if(headIndex === undefined) return false;
+
+      let previousDistance = 0;
+
+      for(let i=1;i<body.length;i++){
+        const idx = cycleIndex.get(pointKey(body[i]));
+        if(idx === undefined) return false;
+
+        const distance =
+          (headIndex - idx + cycle.length) % cycle.length;
+
+        if(distance <= previousDistance || distance === 0){
+          return false;
+        }
+
+        previousDistance = distance;
+      }
+
+      return true;
+    }
+
     function bodyCanReachTail(body){
       if(body.length < 3) return true;
 
@@ -412,35 +457,52 @@
         body.slice(1,-1).map(pointKey)
       );
 
-      const escapePath = bfsPath(head, tail, blocked);
-      return escapePath.length > 0;
+      return bfsPath(head, tail, blocked, 0).length > 0;
     }
 
-    function shortestSafeFoodPath(){
+    function findShortestSafeFoodPath(){
       if(!food) return [];
 
       const blocked = new Set(
         snake.slice(0,-1).map(pointKey)
       );
 
-      const direct = bfsPath(snake[0], food, blocked);
+      let best = [];
 
-      if(!direct.length) return [];
+      for(let mode=0;mode<=6;mode++){
+        const candidate = bfsPath(
+          snake[0],
+          food,
+          blocked,
+          mode
+        );
 
-      const simulated = simulateFoodPath(direct);
+        if(!candidate.length) continue;
 
-      if(simulated && bodyCanReachTail(simulated)){
-        return direct;
+        const simulated = simulateFoodPath(candidate);
+
+        if(!simulated) continue;
+        if(!bodyCanReachTail(simulated)) continue;
+        if(!bodyPreservesCycleOrder(simulated)) continue;
+
+        if(!best.length || candidate.length < best.length){
+          best = candidate;
+        }
       }
 
-      return [];
+      return best;
     }
 
     function chooseMove(){
-      const directPath = shortestSafeFoodPath();
+      if(plannedPath.length){
+        return plannedPath.shift();
+      }
 
-      if(directPath.length){
-        return directPath[0];
+      const direct = findShortestSafeFoodPath();
+
+      if(direct.length){
+        plannedPath = direct;
+        return plannedPath.shift();
       }
 
       const head = snake[0];
@@ -514,6 +576,7 @@
       transitioning = false;
       running = true;
       foodCount = 0;
+      plannedPath = [];
 
       buildLevelCycle();
 
