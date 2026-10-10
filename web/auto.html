@@ -18,7 +18,7 @@
     .brand{display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:12px;color:#e8f0e8;font-weight:800;letter-spacing:.19em;font-size:13px;text-shadow:0 1px #000}
     .speaker{width:38px;height:5px;border-radius:999px;background:#122e29;box-shadow:inset 0 1px 1px #0008}
     .screen-shell{background:var(--screen-edge);padding:12px;border-radius:14px 14px 28px 28px;box-shadow:inset 0 0 12px #000b,0 2px 1px #9bb7af44}
-    .screen{overflow:hidden;background:var(--screen);border:3px solid #566846;box-shadow:inset 0 0 22px #4f603c55;image-rendering:pixelated;transition:background .15s ease}
+    .screen{position:relative;overflow:hidden;background:var(--screen);border:3px solid #566846;box-shadow:inset 0 0 22px #4f603c55;image-rendering:pixelated;transition:background .15s ease}
     .screen.effect-points{background:#c7b86a}
     .screen.effect-food{background:#86b8a0}
     .screen.effect-recovery{background:#b8a56e}
@@ -31,28 +31,30 @@
     .overlay.hidden{display:none}
     .overlay .big{font-size:22px;letter-spacing:.05em;margin-bottom:8px}
     .overlay .small{font-size:12px;line-height:1.45}
-    .status{text-align:center;min-height:18px;margin-top:7px;font-family:monospace;font-size:12px;color:#dce7dc;font-weight:800}
-    .direction-wrap{display:flex;justify-content:center;padding-top:15px}
-    .direction-pad{position:relative;width:164px;height:122px}
-    .dir-key{position:absolute;border:1px solid #79968f66;background:linear-gradient(#52776e,#25443e);box-shadow:inset 0 2px 1px #fff2,0 4px 6px #0007;color:#eef5ef;font-size:21px;font-weight:900;transition:transform .045s ease,box-shadow .045s ease,filter .045s ease}
-    .dir-key.up,.dir-key.down{left:55px;width:54px;height:42px}
-    .dir-key.up{top:0;border-radius:28px 28px 10px 10px}
-    .dir-key.down{bottom:0;border-radius:10px 10px 28px 28px}
-    .dir-key.left,.dir-key.right{top:34px;width:58px;height:54px}
-    .dir-key.left{left:0;border-radius:28px 10px 10px 28px}
-    .dir-key.right{right:0;border-radius:10px 28px 28px 10px}
-    .dir-key.center{left:55px;top:34px;width:54px;height:54px;border-radius:50%;font-size:10px;letter-spacing:.06em;background:linear-gradient(#78968f,#35564f)}
+    .direction-wrap{display:flex;justify-content:center;padding-top:18px}
+    .direction-pad{position:relative;width:184px;height:142px}
+    .dir-key{position:absolute;border:1px solid #79968f66;background:linear-gradient(#52776e,#25443e);box-shadow:inset 0 2px 1px #fff2,0 4px 6px #0007;color:#eef5ef;font-size:21px;font-weight:900;transition:transform .045s ease,box-shadow .045s ease,filter .045s ease;z-index:1}
+    .dir-key.up,.dir-key.down{left:63px;width:58px;height:46px}
+    .dir-key.up{top:0;border-radius:30px 30px 12px 12px}
+    .dir-key.down{bottom:0;border-radius:12px 12px 30px 30px}
+    .dir-key.left,.dir-key.right{top:44px;width:62px;height:56px}
+    .dir-key.left{left:0;border-radius:30px 12px 12px 30px}
+    .dir-key.right{right:0;border-radius:12px 30px 30px 12px}
+    .dir-key.center{left:63px;top:44px;width:58px;height:56px;border-radius:50%;font-size:10px;letter-spacing:.06em;background:linear-gradient(#78968f,#35564f);z-index:2}
     .dir-key.pressed{transform:translateY(3px) scale(.97);box-shadow:inset 0 3px 6px #0009,0 1px 2px #0005;filter:brightness(.82)}
-    .progress{height:6px;margin:7px 3px 0;border-radius:10px;background:#183b35;overflow:hidden;box-shadow:inset 0 1px 2px #0008}
-    .progress>div{height:100%;width:0;background:#cbd8c9;transition:width .08s linear}
-    .controls{padding-top:20px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-    button,select{font:inherit;color:#eef5ef;user-select:none;touch-action:manipulation}
-    select{appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center}
-    select option{background:#2a4943;color:#eef5ef}
-    .soft{height:44px;border-radius:18px 18px 28px 28px;border:1px solid #79968f66;background:linear-gradient(#52756d,#2a4943);box-shadow:inset 0 2px 2px #ffffff22,0 3px 4px #0007;font-weight:800;font-size:11px;letter-spacing:.04em}
-    .soft:active{transform:translateY(2px);box-shadow:inset 0 2px 5px #0008}
-    .tips{margin:14px 6px 0;text-align:center;color:#bac9c4;font-size:12px;line-height:1.45}
-    @media (max-height:760px){body{align-items:flex-start}.phone{padding-top:18px;padding-bottom:22px}.controls{padding-top:13px}.tips{display:none}}
+    button{font:inherit;color:#eef5ef;user-select:none;touch-action:manipulation}
+    .lcd-menu{position:absolute;inset:0;background:#9cad6cf5;color:var(--pixel);z-index:6;padding:12px;font-family:monospace;display:flex;flex-direction:column}
+    .lcd-menu.hidden{display:none}
+    .menu-title{font-weight:900;font-size:15px;text-align:center;border-bottom:2px solid #566846;padding:2px 0 8px;margin-bottom:8px}
+    .menu-actions{display:grid;gap:6px;overflow:auto}
+    .menu-btn{width:100%;border:2px solid #566846;background:#9cad6c;color:var(--pixel);padding:8px 7px;font-family:monospace;font-weight:900;font-size:11px;text-align:left;border-radius:2px}
+    .menu-btn:active{background:#7f9259}
+    .menu-sub{font-size:9px;opacity:.8;margin-top:2px}
+    .leaderboard{display:grid;gap:5px;margin:2px 0 8px}
+    .leader-row{display:grid;grid-template-columns:24px 1fr 52px 68px;gap:4px;align-items:center;font-size:9px;border-bottom:1px solid #566846;padding:3px 0}
+    .leader-row.head{font-weight:900;border-bottom:2px solid #566846}
+    .menu-back{margin-top:auto}
+    @media (max-height:760px){body{align-items:flex-start}.phone{padding-top:18px;padding-bottom:22px}}
   </style>
 </head>
 <body>
@@ -69,30 +71,18 @@
           <canvas id="game" width="240" height="240" aria-label="Automatic Snake game"></canvas>
           <div id="overlay" class="overlay hidden"><div><div class="big">LEVEL 1</div><div class="small">AUTO PLAY</div></div></div>
         </div>
+        <div id="lcdMenu" class="lcd-menu hidden" aria-label="Game menu"></div>
       </div></div>
-
-      <div id="status" class="status">AUTO HUNT</div>
-      <div class="progress"><div id="progressBar"></div></div>
 
       <div class="direction-wrap" aria-label="Automatic direction indicator">
         <div class="direction-pad">
           <button class="dir-key up" id="dirUp" type="button" tabindex="-1" aria-label="Moving up">▲</button>
           <button class="dir-key left" id="dirLeft" type="button" tabindex="-1" aria-label="Moving left">◀</button>
-          <button class="dir-key center" type="button" tabindex="-1" aria-hidden="true">AUTO</button>
+          <button class="dir-key center" id="menuBtn" type="button" aria-label="Menu">MENU</button>
           <button class="dir-key right" id="dirRight" type="button" tabindex="-1" aria-label="Moving right">▶</button>
           <button class="dir-key down" id="dirDown" type="button" tabindex="-1" aria-label="Moving down">▼</button>
         </div>
       </div>
-
-      <div class="controls">
-        <button id="pauseBtn" class="soft">PAUSE</button>
-        <button id="testSpeedBtn" class="soft">TEST SPEED ×1</button>
-        <select id="testLevelSelect" class="soft" aria-label="Select test level"></select>
-        <button id="soundBtn" class="soft">SOUND OFF</button>
-        <button id="restartBtn" class="soft">RESTART</button>
-      </div>
-
-      <div class="tips">Bombs halve snake • recover before scoring • timed LCD bonuses</div>
     </section>
   </main>
 
@@ -107,19 +97,17 @@
     const screenLevel = document.getElementById('screenLevel');
     const screenPoints = document.getElementById('screenPoints');
     const screenEffect = document.getElementById('screenEffect');
-    const statusEl = document.getElementById('status');
+    const lcdMenu = document.getElementById('lcdMenu');
+    const menuBtn = document.getElementById('menuBtn');
+    const statusEl = {textContent:''};
     const dirButtons = {
       up: document.getElementById('dirUp'),
       down: document.getElementById('dirDown'),
       left: document.getElementById('dirLeft'),
       right: document.getElementById('dirRight')
     };
-    const progressBar = document.getElementById('progressBar');
-    const pauseBtn = document.getElementById('pauseBtn');
-    const testSpeedBtn = document.getElementById('testSpeedBtn');
-    const testLevelSelect = document.getElementById('testLevelSelect');
-    const soundBtn = document.getElementById('soundBtn');
-    const restartBtn = document.getElementById('restartBtn');
+    const progressBar = {style:{width:''}};
+    const testLevelSelect = {value:''};
 
     const COLS = 30;
     const ROWS = 30;
@@ -166,6 +154,7 @@
     let cycleIndex = new Map();
     let running = true;
     let transitioning = false;
+    let menuOpen = false;
     let timer = null;
     let soundOn = false;
     let audioCtx = null;
@@ -189,6 +178,76 @@
     function cellKey(x, y){ return x + ',' + y; }
     function pointKey(p){ return cellKey(p.x, p.y); }
     function macroKey(x, y){ return x + ':' + y; }
+    const SAVE_KEY = 'snake3310AutoSaveV1';
+
+    function clonePoints(items){
+      return items.map(item=>({...item}));
+    }
+
+    function saveProgress(){
+      const state={
+        version:1,
+        level,points,
+        snake:clonePoints(snake),
+        foods:clonePoints(foods),
+        food:food?{...food}:null,
+        bombs:clonePoints(bombs),
+        bonuses:clonePoints(bonuses),
+        doublePointsSteps,doubleFoodSteps,
+        bombSpawnCooldownSteps,bonusSpawnCooldownSteps,
+        recoveryTargetLength,closingMode,closureSteps,
+        soundOn,
+        savedAt:Date.now()
+      };
+      localStorage.setItem(SAVE_KEY,JSON.stringify(state));
+    }
+
+    function readSavedProgress(){
+      try{
+        const raw=localStorage.getItem(SAVE_KEY);
+        return raw?JSON.parse(raw):null;
+      }catch(e){
+        return null;
+      }
+    }
+
+    function loadSavedProgress(){
+      const saved=readSavedProgress();
+      if(!saved||!Array.isArray(saved.snake)||!saved.snake.length) return false;
+
+      clearTimeout(timer);
+      level=Math.max(1,Number(saved.level)||1);
+      points=Math.max(0,Number(saved.points)||0);
+      soundOn=!!saved.soundOn;
+      buildLevelCycle();
+
+      snake=clonePoints(saved.snake).filter(p=>cycleIndex.has(pointKey(p)));
+      if(!snake.length) return false;
+
+      foods=clonePoints(saved.foods||[]).filter(p=>cycleIndex.has(pointKey(p)));
+      food=saved.food&&cycleIndex.has(pointKey(saved.food))
+        ? {...saved.food}
+        : (foods[0]?{...foods[0]}:null);
+      bombs=clonePoints(saved.bombs||[]);
+      bonuses=clonePoints(saved.bonuses||[]);
+      doublePointsSteps=Math.max(0,Number(saved.doublePointsSteps)||0);
+      doubleFoodSteps=Math.max(0,Number(saved.doubleFoodSteps)||0);
+      bombSpawnCooldownSteps=Number(saved.bombSpawnCooldownSteps)||0;
+      bonusSpawnCooldownSteps=Number(saved.bonusSpawnCooldownSteps)||0;
+      recoveryTargetLength=Math.max(0,Number(saved.recoveryTargetLength)||0);
+      closingMode=!!saved.closingMode;
+      closureSteps=Math.max(0,Number(saved.closureSteps)||0);
+      explosion=null;
+      hazardMessage='';
+      hazardMessageUntil=0;
+      transitioning=false;
+      running=false;
+      showDirection(null);
+      ensureFoodCount();
+      updateHud();
+      draw();
+      return true;
+    }
 
     function parseCellKey(k){
       const parts = k.split(',');
@@ -1381,6 +1440,102 @@
       timer = setTimeout(step,levelDelay());
     }
 
+    const FAKE_LEADERS=[
+      {name:'SNAKE KING',level:41,points:98240},
+      {name:'PIXEL PRO',level:37,points:81120},
+      {name:'NOKIA 3310',level:34,points:70950},
+      {name:'GRID MASTER',level:29,points:55880}
+    ];
+
+    function formatPoints(value){
+      return Number(value||0).toLocaleString('en-GB');
+    }
+
+    function showMainMenu(message=''){
+      const saved=readSavedProgress();
+      lcdMenu.innerHTML=
+        '<div class="menu-title">SNAKE MENU</div>'+
+        '<div class="menu-actions">'+
+        (message?'<div class="menu-sub" style="text-align:center;font-weight:900">'+message+'</div>':'')+
+        '<button class="menu-btn" data-menu="resume">RESUME GAME</button>'+
+        '<button class="menu-btn" data-menu="leaderboard">LEADERBOARD<div class="menu-sub">Level & points</div></button>'+
+        '<button class="menu-btn" data-menu="save">SAVE PROGRESS<div class="menu-sub">Continue next time</div></button>'+
+        (saved?'<button class="menu-btn" data-menu="load">LOAD SAVED<div class="menu-sub">Level '+saved.level+' • '+formatPoints(saved.points)+' pts</div></button>':'')+
+        '<button class="menu-btn" data-menu="sound">SOUND: '+(soundOn?'ON':'OFF')+'</button>'+
+        '<button class="menu-btn" data-menu="restart">RESTART GAME</button>'+
+        '</div>';
+    }
+
+    function showLeaderboard(){
+      const rows=[...FAKE_LEADERS,{name:'YOU',level,points}]
+        .sort((a,b)=>b.level-a.level||b.points-a.points)
+        .slice(0,5);
+
+      lcdMenu.innerHTML=
+        '<div class="menu-title">LEADERBOARD</div>'+
+        '<div class="leaderboard">'+
+        '<div class="leader-row head"><span>#</span><span>PLAYER</span><span>LVL</span><span>POINTS</span></div>'+
+        rows.map((row,index)=>
+          '<div class="leader-row"><span>'+(index+1)+'</span><span>'+row.name+'</span><span>'+row.level+'</span><span>'+formatPoints(row.points)+'</span></div>'
+        ).join('')+
+        '</div>'+
+        '<button class="menu-btn menu-back" data-menu="back">BACK</button>';
+    }
+
+    function openMenu(){
+      if(menuOpen) return;
+      menuOpen=true;
+      running=false;
+      clearTimeout(timer);
+      showDirection(null);
+      showMainMenu();
+      lcdMenu.classList.remove('hidden');
+    }
+
+    function closeMenu(){
+      if(!menuOpen) return;
+      menuOpen=false;
+      lcdMenu.classList.add('hidden');
+      if(!transitioning){
+        running=true;
+        timer=setTimeout(step,levelDelay());
+      }
+    }
+
+    function restartGame(){
+      localStorage.removeItem(SAVE_KEY);
+      level=1;
+      points=0;
+      menuOpen=false;
+      lcdMenu.classList.add('hidden');
+      startLevel();
+    }
+
+    function handleMenuAction(action){
+      if(action==='resume'){ closeMenu(); return; }
+      if(action==='leaderboard'){ showLeaderboard(); return; }
+      if(action==='back'){ showMainMenu(); return; }
+      if(action==='save'){
+        saveProgress();
+        showMainMenu('PROGRESS SAVED');
+        return;
+      }
+      if(action==='load'){
+        const ok=loadSavedProgress();
+        showMainMenu(ok?'SAVE LOADED':'NO VALID SAVE');
+        return;
+      }
+      if(action==='sound'){
+        soundOn=!soundOn;
+        if(soundOn) beep(650,.04);
+        showMainMenu();
+        return;
+      }
+      if(action==='restart'){
+        restartGame();
+      }
+    }
+
     function beep(freq,duration){
       if(!soundOn) return;
 
@@ -1435,7 +1590,8 @@
 
       spawnFood();
       overlay.classList.add('hidden');
-      pauseBtn.textContent='PAUSE';
+      lcdMenu.classList.add('hidden');
+      menuOpen=false;
 
       updateHud();
       draw();
@@ -1743,77 +1899,29 @@
       ctx.strokeRect(1,1,W-2,H-2);
     }
 
-    for(let testLevel=1;testLevel<=30;testLevel++){
-      const option = document.createElement('option');
-      option.value = String(testLevel);
-      option.textContent = 'TEST LEVEL ' + testLevel;
-      testLevelSelect.appendChild(option);
-    }
-
-    pauseBtn.addEventListener('click',()=>{
-      if(transitioning) return;
-
-      running=!running;
-      pauseBtn.textContent=running?'PAUSE':'RESUME';
-
-      if(running){
-        overlay.classList.add('hidden');
-        timer=setTimeout(step,levelDelay());
-      }else{
-        clearTimeout(timer);
-        overlay.innerHTML=
-          '<div><div class="big">PAUSED</div><div class="small">PRESS RESUME</div></div>';
-        overlay.classList.remove('hidden');
-      }
+    menuBtn.addEventListener('click',()=>{
+      if(menuOpen) closeMenu();
+      else openMenu();
     });
 
-    testSpeedBtn.addEventListener('click',()=>{
-      testSpeedIndex =
-        (testSpeedIndex + 1) % TEST_SPEEDS.length;
-
-      testSpeedBtn.textContent =
-        'TEST SPEED ×' + TEST_SPEEDS[testSpeedIndex];
-
-      if(running && !transitioning){
-        clearTimeout(timer);
-        timer=setTimeout(step,levelDelay());
-      }
-    });
-
-    testLevelSelect.addEventListener('change',()=>{
-      const selected = Number(testLevelSelect.value);
-
-      if(!Number.isFinite(selected) || selected < 1) return;
-
-      level = selected;
-      points = 0;
-      startLevel();
-    });
-
-    soundBtn.addEventListener('click',()=>{
-      soundOn=!soundOn;
-      soundBtn.textContent=soundOn?'SOUND ON':'SOUND OFF';
-      if(soundOn) beep(650,.04);
-    });
-
-    restartBtn.addEventListener('click',()=>{
-      level = 1;
-      points = 0;
-      startLevel();
+    lcdMenu.addEventListener('click',event=>{
+      const button=event.target.closest('[data-menu]');
+      if(!button) return;
+      handleMenuAction(button.dataset.menu);
     });
 
     document.addEventListener('visibilitychange',()=>{
       if(document.hidden && running && !transitioning){
-        running=false;
-        clearTimeout(timer);
-        pauseBtn.textContent='RESUME';
-        overlay.innerHTML=
-          '<div><div class="big">PAUSED</div><div class="small">PRESS RESUME</div></div>';
-        overlay.classList.remove('hidden');
+        openMenu();
       }
     });
 
     startLevel();
+
+    if(readSavedProgress()){
+      openMenu();
+      showMainMenu('SAVED GAME AVAILABLE');
+    }
   })();
   </script>
 </body>
