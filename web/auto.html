@@ -87,7 +87,7 @@
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">TEST LEVEL selects any level • obstacles from 6 • bombs from 8</div>
+      <div class="tips">Food increases every 2 levels • obstacles from 6 • bombs from 8</div>
     </section>
   </main>
 
@@ -428,8 +428,10 @@
     }
 
     function foodTargetCount(){
-      if(closingMode) return 1;
-      return Math.min(5, Math.max(1, level));
+      return Math.min(
+        10,
+        1 + Math.floor((Math.max(1,level) - 1) / 2)
+      );
     }
 
     function bombTargetCount(){
@@ -454,9 +456,8 @@
       closureSteps = 0;
       plannedPath = [];
 
-      if(foods.length > 1){
-        foods = food ? [food] : [foods[0]];
-      }
+      chooseFoodTarget();
+      ensureFoodCount();
     }
 
     function buildFoodCandidates(){
