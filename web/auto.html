@@ -564,6 +564,7 @@
     function chooseFoodTarget(){
       if(!foods.length){
         food = null;
+        plannedPath = [];
         return;
       }
 
@@ -582,6 +583,21 @@
 
         food = foods[0];
         plannedPath = [];
+        return;
+      }
+
+      const currentStillExists =
+        food && foods.some(candidate=>same(candidate,food));
+
+      if(currentStillExists){
+        if(!plannedPath.length){
+          const currentPath = orderedPathTo(food);
+
+          if(currentPath.length){
+            plannedPath = currentPath.slice();
+          }
+        }
+
         return;
       }
 
@@ -857,7 +873,16 @@
         ensureBombCount();
         chooseFoodTarget();
       }else if(willEat){
+        const ateActiveTarget =
+          food && same(foods[eatenIndex],food);
+
         foods.splice(eatenIndex,1);
+
+        if(ateActiveTarget){
+          food = null;
+          plannedPath = [];
+        }
+
         foodCount++;
         points += level;
         beep(720,0.03);
