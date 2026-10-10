@@ -1119,7 +1119,7 @@
       const immediate =
         cycle[(headIndex+1)%cycle.length];
 
-      if(moveIsSafe(immediate)){
+      if(moveKeepsEscape(immediate)){
         return {...immediate};
       }
 
