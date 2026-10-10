@@ -50,7 +50,7 @@
     .menu-btn{width:100%;border:2px solid #566846;background:#9cad6c;color:var(--pixel);padding:8px 7px;font-family:monospace;font-weight:900;font-size:11px;text-align:left;border-radius:2px}
     .menu-btn:active{background:#7f9259}
     .menu-sub{font-size:9px;opacity:.8;margin-top:2px}
-    .leaderboard{display:grid;gap:5px;margin:2px 0 8px}
+    .leaderboard{display:grid;gap:5px;margin:2px 0 8px;overflow-y:auto;min-height:0;flex:1;padding-right:2px}
     .leader-row{display:grid;grid-template-columns:24px 1fr 52px 68px;gap:4px;align-items:center;font-size:9px;border-bottom:1px solid #566846;padding:3px 0}
     .leader-row.head{font-weight:900;border-bottom:2px solid #566846}
     .menu-back{margin-top:auto}
@@ -1441,10 +1441,26 @@
     }
 
     const FAKE_LEADERS=[
-      {name:'SNAKE KING',level:41,points:98240},
-      {name:'PIXEL PRO',level:37,points:81120},
-      {name:'NOKIA 3310',level:34,points:70950},
-      {name:'GRID MASTER',level:29,points:55880}
+      {name:'SNAKE KING',level:58,points:164820},
+      {name:'PIXEL PRO',level:54,points:151440},
+      {name:'GRID MASTER',level:51,points:140760},
+      {name:'NOKIA 3310',level:48,points:129500},
+      {name:'COBRA X',level:45,points:118220},
+      {name:'BYTE VIPER',level:43,points:110840},
+      {name:'LCD LEGEND',level:41,points:103610},
+      {name:'TAIL CHASER',level:39,points:96180},
+      {name:'RETRO RAY',level:37,points:89140},
+      {name:'DOT MATRIX',level:35,points:82470},
+      {name:'SPEED SNAKE',level:33,points:75620},
+      {name:'GREEN SCREEN',level:31,points:69810},
+      {name:'BITE ME',level:29,points:64150},
+      {name:'PIXEL PETE',level:27,points:58630},
+      {name:'NO SIGNAL',level:25,points:53280},
+      {name:'OLD SCHOOL',level:23,points:47820},
+      {name:'SNAKE EYES',level:21,points:42640},
+      {name:'MONOCHROME',level:19,points:37190},
+      {name:'BRICK PHONE',level:17,points:31980},
+      {name:'TINY TAIL',level:15,points:26840}
     ];
 
     function formatPoints(value){
@@ -1468,8 +1484,7 @@
 
     function showLeaderboard(){
       const rows=[...FAKE_LEADERS,{name:'YOU',level,points}]
-        .sort((a,b)=>b.level-a.level||b.points-a.points)
-        .slice(0,5);
+        .sort((a,b)=>b.level-a.level||b.points-a.points);
 
       lcdMenu.innerHTML=
         '<div class="menu-title">LEADERBOARD</div>'+
