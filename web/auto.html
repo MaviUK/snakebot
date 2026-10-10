@@ -42,7 +42,9 @@
     .progress{height:6px;margin:7px 3px 0;border-radius:10px;background:#183b35;overflow:hidden;box-shadow:inset 0 1px 2px #0008}
     .progress>div{height:100%;width:0;background:#cbd8c9;transition:width .08s linear}
     .controls{padding-top:20px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-    button{font:inherit;color:#eef5ef;user-select:none;touch-action:manipulation}
+    button,select{font:inherit;color:#eef5ef;user-select:none;touch-action:manipulation}
+    select{appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center}
+    select option{background:#2a4943;color:#eef5ef}
     .soft{height:44px;border-radius:18px 18px 28px 28px;border:1px solid #79968f66;background:linear-gradient(#52756d,#2a4943);box-shadow:inset 0 2px 2px #ffffff22,0 3px 4px #0007;font-weight:800;font-size:11px;letter-spacing:.04em}
     .soft:active{transform:translateY(2px);box-shadow:inset 0 2px 5px #0008}
     .tips{margin:14px 6px 0;text-align:center;color:#bac9c4;font-size:12px;line-height:1.45}
@@ -80,11 +82,12 @@
       <div class="controls">
         <button id="pauseBtn" class="soft">PAUSE</button>
         <button id="testSpeedBtn" class="soft">TEST SPEED ×1</button>
+        <select id="testLevelSelect" class="soft" aria-label="Select test level"></select>
         <button id="soundBtn" class="soft">SOUND OFF</button>
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">More food each level • obstacles from level 6 • bombs from level 8</div>
+      <div class="tips">TEST LEVEL selects any level • obstacles from 6 • bombs from 8</div>
     </section>
   </main>
 
@@ -107,6 +110,7 @@
     const progressBar = document.getElementById('progressBar');
     const pauseBtn = document.getElementById('pauseBtn');
     const testSpeedBtn = document.getElementById('testSpeedBtn');
+    const testLevelSelect = document.getElementById('testLevelSelect');
     const soundBtn = document.getElementById('soundBtn');
     const restartBtn = document.getElementById('restartBtn');
 
@@ -1006,6 +1010,10 @@
       screenLevel.textContent =
         'LEVEL ' + String(level).padStart(2,'0');
 
+      if(level <= 30){
+        testLevelSelect.value = String(level);
+      }
+
       screenPoints.textContent =
         'POINTS ' + String(points);
 
@@ -1140,6 +1148,13 @@
       ctx.strokeRect(1,1,W-2,H-2);
     }
 
+    for(let testLevel=1;testLevel<=30;testLevel++){
+      const option = document.createElement('option');
+      option.value = String(testLevel);
+      option.textContent = 'TEST LEVEL ' + testLevel;
+      testLevelSelect.appendChild(option);
+    }
+
     pauseBtn.addEventListener('click',()=>{
       if(transitioning) return;
 
@@ -1168,6 +1183,16 @@
         clearTimeout(timer);
         timer=setTimeout(step,levelDelay());
       }
+    });
+
+    testLevelSelect.addEventListener('change',()=>{
+      const selected = Number(testLevelSelect.value);
+
+      if(!Number.isFinite(selected) || selected < 1) return;
+
+      level = selected;
+      points = 0;
+      startLevel();
     });
 
     soundBtn.addEventListener('click',()=>{
