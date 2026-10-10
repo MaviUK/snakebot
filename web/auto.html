@@ -1322,13 +1322,13 @@
         return safeClosingMove();
       }
 
-      const foodPath = food
-        ? (
-            directSafePathTo(food).length
-              ? directSafePathTo(food)
-              : orderedPathTo(food)
-          )
+      const directFoodPath = food
+        ? directSafePathTo(food)
         : [];
+
+      const foodPath = directFoodPath.length
+        ? directFoodPath
+        : (food ? orderedPathTo(food) : []);
 
       const bonusChoice = nearestBonusPath();
 
