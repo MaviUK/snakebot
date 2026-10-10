@@ -87,7 +87,7 @@
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">Avoid bombs • chase bonuses • closing lines at 85%</div>
+      <div class="tips">Food first • nearby bonuses • avoid bombs • closing at 85%</div>
     </section>
   </main>
 
@@ -152,6 +152,7 @@
     let bonuses = [];
     let doublePointsSteps = 0;
     let doubleFoodSteps = 0;
+    let bonusSpawnCooldownSteps = 0;
     let obstacles = new Set();
     let cycle = [];
     let cycleIndex = new Map();
@@ -172,6 +173,9 @@
     const BOMB_LIFETIME_STEPS = 60;
     const BONUS_LIFETIME_STEPS = 110;
     const BONUS_EFFECT_STEPS = 140;
+    const BONUS_RESPAWN_COOLDOWN_STEPS = 55;
+    const BONUS_MAX_CHASE_STEPS = 12;
+    const BONUS_EXTRA_DETOUR_STEPS = 3;
     let testSpeedIndex = 0;
 
     function cellKey(x, y){ return x + ',' + y; }
@@ -781,6 +785,13 @@
     function ensureBonusCount(){
       const target = bonusTargetCount();
 
+      if(bonusSpawnCooldownSteps > 0){
+        if(bonuses.length > target){
+          bonuses = bonuses.slice(0,target);
+        }
+        return;
+      }
+
       while(bonuses.length < target){
         if(!addOneBonus()) break;
       }
@@ -805,6 +816,7 @@
 
       if(doublePointsSteps > 0) doublePointsSteps--;
       if(doubleFoodSteps > 0) doubleFoodSteps--;
+      if(bonusSpawnCooldownSteps > 0) bonusSpawnCooldownSteps--;
 
       ensureBombCount();
       ensureBonusCount();
@@ -824,6 +836,7 @@
         ensureFoodCount();
       }
 
+      bonusSpawnCooldownSteps = BONUS_RESPAWN_COOLDOWN_STEPS;
       hazardMessageUntil = Date.now() + 1200;
       plannedPath = [];
       beep(980,0.06);
@@ -836,6 +849,20 @@
       let best = null;
 
       for(const bonus of bonuses){
+        if(
+          bonus.type === 'double-points' &&
+          doublePointsSteps > 40
+        ){
+          continue;
+        }
+
+        if(
+          bonus.type === 'double-food' &&
+          doubleFoodSteps > 40
+        ){
+          continue;
+        }
+
         const path = orderedPathTo(bonus);
         if(!path.length) continue;
 
@@ -1018,9 +1045,25 @@
         activateClosingMode();
       }
 
+      chooseFoodTarget();
+
+      const foodPath = food
+        ? orderedPathTo(food)
+        : [];
+
       const bonusChoice = nearestBonusPath();
 
-      if(bonusChoice && bonusChoice.path.length){
+      const bonusIsWorthDetour =
+        bonusChoice &&
+        bonusChoice.path.length > 0 &&
+        bonusChoice.path.length <= BONUS_MAX_CHASE_STEPS &&
+        (
+          !foodPath.length ||
+          bonusChoice.path.length <=
+            foodPath.length + BONUS_EXTRA_DETOUR_STEPS
+        );
+
+      if(bonusIsWorthDetour){
         plannedPath = bonusChoice.path.slice(1);
         return bonusChoice.path[0];
       }
@@ -1037,12 +1080,8 @@
         }
       }
 
-      chooseFoodTarget();
-
-      const direct = orderedPathTo(food);
-
-      if(direct.length){
-        plannedPath = direct;
+      if(foodPath.length){
+        plannedPath = foodPath.slice();
         return plannedPath.shift();
       }
 
@@ -1140,7 +1179,6 @@
         const bonus = bonuses[bonusIndex];
         bonuses.splice(bonusIndex,1);
         activateBonus(bonus);
-        ensureBonusCount();
         snake.pop();
       }else if(willEat){
         const ateActiveTarget =
@@ -1204,6 +1242,7 @@
       bonuses = [];
       doublePointsSteps = 0;
       doubleFoodSteps = 0;
+      bonusSpawnCooldownSteps = 0;
       hazardMessage = '';
       hazardMessageUntil = 0;
       currentDirection = null;
