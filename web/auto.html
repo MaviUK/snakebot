@@ -339,10 +339,10 @@
     }
 
     function closureWindowSize(fillRatio){
-      if(fillRatio >= 0.92) return 6;
-      if(fillRatio >= 0.84) return 14;
-      if(fillRatio >= 0.74) return 30;
-      if(fillRatio >= 0.64) return 54;
+      if(fillRatio >= 0.92) return 8;
+      if(fillRatio >= 0.84) return 16;
+      if(fillRatio >= 0.74) return 32;
+      if(fillRatio >= 0.64) return 56;
       return Infinity;
     }
 
@@ -394,7 +394,10 @@
           return;
         }
 
-        food = {...anyFree[0]};
+        const fallback =
+          anyFree[Math.floor(Math.random()*anyFree.length)];
+
+        food = {...fallback};
         return;
       }
 
@@ -407,10 +410,10 @@
         );
       }
 
-      let best = null;
+      const viable = [];
 
-      for(let i=0;i<safeFree.length;i++){
-        const candidate = safeFree[i].p;
+      for(const item of safeFree){
+        const candidate = item.p;
         const path = orderedPathTo(candidate);
 
         if(!path.length) continue;
@@ -422,41 +425,51 @@
         const detourRatio =
           path.length / Math.max(1,manhattan);
 
-        const gapPenalty =
-          fillRatio < 0.64
-            ? 0
-            : i * (
-                fillRatio >= 0.92 ? 2.5 :
-                fillRatio >= 0.84 ? 1.35 :
-                fillRatio >= 0.74 ? 0.65 :
-                0.25
-              );
-
-        const distancePenalty =
-          safeFree[i].advance *
-          (fillRatio >= 0.84 ? 0.018 : 0.006);
-
-        const score =
-          detourRatio +
-          gapPenalty +
-          distancePenalty;
-
-        if(!best || score < best.score){
-          best = {
-            candidate,
-            path,
-            score
-          };
-        }
+        viable.push({
+          candidate,
+          path,
+          detourRatio,
+          advance:item.advance
+        });
       }
 
-      if(best){
-        food = {...best.candidate};
-        plannedPath = best.path.slice();
+      if(viable.length){
+        const directish = viable.filter(v=>
+          v.detourRatio <= (
+            fillRatio >= 0.84 ? 1.8 :
+            fillRatio >= 0.64 ? 1.65 :
+            1.5
+          )
+        );
+
+        let pool = directish.length
+          ? directish
+          : viable
+              .slice()
+              .sort((a,b)=>a.detourRatio-b.detourRatio)
+              .slice(0,Math.min(12,viable.length));
+
+        if(pool.length >= 4){
+          const notRightInFront =
+            pool.filter(v=>v.path.length >= 3);
+
+          if(notRightInFront.length >= 2){
+            pool = notRightInFront;
+          }
+        }
+
+        const pick =
+          pool[Math.floor(Math.random()*pool.length)];
+
+        food = {...pick.candidate};
+        plannedPath = pick.path.slice();
         return;
       }
 
-      food = {...safeFree[0].p};
+      const fallback =
+        safeFree[Math.floor(Math.random()*safeFree.length)].p;
+
+      food = {...fallback};
     }
 
     function orderedPathTo(target){
