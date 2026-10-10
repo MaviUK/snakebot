@@ -24,8 +24,20 @@
     .overlay.hidden{display:none}
     .overlay .big{font-size:22px;letter-spacing:.05em;margin-bottom:8px}
     .overlay .small{font-size:12px;line-height:1.45}
-    .hud{display:flex;justify-content:space-between;margin:8px 2px 0;font-family:monospace;font-weight:900;color:#dce7dc;font-size:12px;text-shadow:0 1px #000;gap:8px}
-    .status{text-align:center;min-height:18px;margin-top:5px;font-family:monospace;font-size:12px;color:#dce7dc;font-weight:800}
+    .screen-hud{position:absolute;left:7px;right:7px;top:5px;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--pixel);font-family:monospace;font-weight:900;font-size:11px;letter-spacing:.02em;pointer-events:none;text-shadow:0 1px #c7d29a66}
+    .screen-hud span{background:#9cad6ccc;padding:2px 4px;border-radius:2px}
+    .status{text-align:center;min-height:18px;margin-top:7px;font-family:monospace;font-size:12px;color:#dce7dc;font-weight:800}
+    .direction-wrap{display:flex;justify-content:center;padding-top:15px}
+    .direction-pad{position:relative;width:164px;height:122px}
+    .dir-key{position:absolute;border:1px solid #79968f66;background:linear-gradient(#52776e,#25443e);box-shadow:inset 0 2px 1px #fff2,0 4px 6px #0007;color:#eef5ef;font-size:21px;font-weight:900;transition:transform .045s ease,box-shadow .045s ease,filter .045s ease}
+    .dir-key.up,.dir-key.down{left:55px;width:54px;height:42px}
+    .dir-key.up{top:0;border-radius:28px 28px 10px 10px}
+    .dir-key.down{bottom:0;border-radius:10px 10px 28px 28px}
+    .dir-key.left,.dir-key.right{top:34px;width:58px;height:54px}
+    .dir-key.left{left:0;border-radius:28px 10px 10px 28px}
+    .dir-key.right{right:0;border-radius:10px 28px 28px 10px}
+    .dir-key.center{left:55px;top:34px;width:54px;height:54px;border-radius:50%;font-size:10px;letter-spacing:.06em;background:linear-gradient(#78968f,#35564f)}
+    .dir-key.pressed{transform:translateY(3px) scale(.97);box-shadow:inset 0 3px 6px #0009,0 1px 2px #0005;filter:brightness(.82)}
     .progress{height:6px;margin:7px 3px 0;border-radius:10px;background:#183b35;overflow:hidden;box-shadow:inset 0 1px 2px #0008}
     .progress>div{height:100%;width:0;background:#cbd8c9;transition:width .08s linear}
     .controls{padding-top:20px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -42,16 +54,25 @@
       <div class="brand"><span class="speaker"></span><span>SNAKE AUTO 3310</span><span class="speaker"></span></div>
       <div class="screen-shell"><div class="screen">
         <canvas id="game" width="240" height="240" aria-label="Automatic Snake game"></canvas>
+        <div class="screen-hud" aria-label="Game score">
+          <span id="screenLevel">LEVEL 01</span>
+          <span id="screenPoints">POINTS 000000</span>
+        </div>
         <div id="overlay" class="overlay hidden"><div><div class="big">LEVEL 1</div><div class="small">AUTO PLAY</div></div></div>
       </div></div>
 
-      <div class="hud">
-        <span id="leftHud">LEVEL 01</span>
-        <span id="rightHud">LEN 005/900</span>
-      </div>
-
       <div id="status" class="status">AUTO HUNT</div>
       <div class="progress"><div id="progressBar"></div></div>
+
+      <div class="direction-wrap" aria-label="Automatic direction indicator">
+        <div class="direction-pad">
+          <button class="dir-key up" id="dirUp" type="button" tabindex="-1" aria-label="Moving up">▲</button>
+          <button class="dir-key left" id="dirLeft" type="button" tabindex="-1" aria-label="Moving left">◀</button>
+          <button class="dir-key center" type="button" tabindex="-1" aria-hidden="true">AUTO</button>
+          <button class="dir-key right" id="dirRight" type="button" tabindex="-1" aria-label="Moving right">▶</button>
+          <button class="dir-key down" id="dirDown" type="button" tabindex="-1" aria-label="Moving down">▼</button>
+        </div>
+      </div>
 
       <div class="controls">
         <button id="pauseBtn" class="soft">PAUSE</button>
@@ -71,9 +92,15 @@
     ctx.imageSmoothingEnabled = false;
 
     const overlay = document.getElementById('overlay');
-    const leftHud = document.getElementById('leftHud');
-    const rightHud = document.getElementById('rightHud');
+    const screenLevel = document.getElementById('screenLevel');
+    const screenPoints = document.getElementById('screenPoints');
     const statusEl = document.getElementById('status');
+    const dirButtons = {
+      up: document.getElementById('dirUp'),
+      down: document.getElementById('dirDown'),
+      left: document.getElementById('dirLeft'),
+      right: document.getElementById('dirRight')
+    };
     const progressBar = document.getElementById('progressBar');
     const pauseBtn = document.getElementById('pauseBtn');
     const testSpeedBtn = document.getElementById('testSpeedBtn');
@@ -122,6 +149,8 @@
     let soundOn = false;
     let audioCtx = null;
     let foodCount = 0;
+    let points = 0;
+    let currentDirection = null;
     let plannedPath = [];
     let closingMode = false;
     let closureSteps = 0;
@@ -659,6 +688,29 @@
       return {...cycle[(hi+1)%cycle.length]};
     }
 
+    function directionName(from,to){
+      const dx = to.x-from.x;
+      const dy = to.y-from.y;
+
+      if(dx === 1) return 'right';
+      if(dx === -1) return 'left';
+      if(dy === 1) return 'down';
+      if(dy === -1) return 'up';
+
+      return null;
+    }
+
+    function showDirection(direction){
+      currentDirection = direction;
+
+      for(const [name,button] of Object.entries(dirButtons)){
+        button.classList.toggle(
+          'pressed',
+          name === direction
+        );
+      }
+    }
+
     function same(a,b){
       return !!a && !!b && a.x===b.x && a.y===b.y;
     }
@@ -669,6 +721,9 @@
       if(!running || transitioning) return;
 
       const next = chooseMove();
+      showDirection(
+        directionName(snake[0],next)
+      );
       const willEat = same(next,food);
       const blockedBody = new Set((willEat ? snake : snake.slice(0,-1)).map(pointKey));
 
@@ -685,6 +740,7 @@
 
       if(willEat){
         foodCount++;
+        points += 10;
         beep(720,0.03);
 
         if(snake.length >= cycle.length){
@@ -727,6 +783,8 @@
       transitioning = false;
       running = true;
       foodCount = 0;
+      currentDirection = null;
+      showDirection(null);
       plannedPath = [];
       closingMode = false;
       closureSteps = 0;
@@ -794,12 +852,11 @@
       const obstacleCells = obstacles.size;
       const total = cycle.length;
 
-      leftHud.textContent =
-        'LEVEL ' + String(level).padStart(2,'0') +
-        (obstacleCells ? '  WALL ' + String(obstacleCells).padStart(2,'0') : '');
+      screenLevel.textContent =
+        'LEVEL ' + String(level).padStart(2,'0');
 
-      rightHud.textContent =
-        'LEN ' + String(snake.length).padStart(3,'0') + '/' + total;
+      screenPoints.textContent =
+        'POINTS ' + String(points).padStart(6,'0');
 
       progressBar.style.width =
         ((snake.length/total)*100).toFixed(1)+'%';
@@ -942,6 +999,8 @@
     });
 
     restartBtn.addEventListener('click',()=>{
+      level = 1;
+      points = 0;
       startLevel();
     });
 
