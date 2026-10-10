@@ -87,7 +87,7 @@
         <button id="restartBtn" class="soft">RESTART</button>
       </div>
 
-      <div class="tips">Food increases every 2 levels • obstacles from 6 • bombs from 8</div>
+      <div class="tips">Closing lines at 85% • 2×2 timed bombs • bonuses from level 10</div>
     </section>
   </main>
 
@@ -149,6 +149,9 @@
     let foods = [];
     let food = null;
     let bombs = [];
+    let bonuses = [];
+    let doublePointsSteps = 0;
+    let doubleFoodSteps = 0;
     let obstacles = new Set();
     let cycle = [];
     let cycleIndex = new Map();
@@ -166,6 +169,9 @@
     let closingMode = false;
     let closureSteps = 0;
     const TEST_SPEEDS = [1,2,4,8];
+    const BOMB_LIFETIME_STEPS = 60;
+    const BONUS_LIFETIME_STEPS = 110;
+    const BONUS_EFFECT_STEPS = 140;
     let testSpeedIndex = 0;
 
     function cellKey(x, y){ return x + ',' + y; }
@@ -420,23 +426,52 @@
     }
 
     function closureWindowSize(fillRatio){
-      if(fillRatio >= 0.94) return 10;
-      if(fillRatio >= 0.86) return 20;
-      if(fillRatio >= 0.75) return 34;
-      if(fillRatio >= 0.70) return 56;
+      if(fillRatio >= 0.97) return 10;
+      if(fillRatio >= 0.93) return 20;
+      if(fillRatio >= 0.89) return 34;
+      if(fillRatio >= 0.85) return 56;
       return Infinity;
     }
 
-    function foodTargetCount(){
+    function baseFoodTargetCount(){
       return Math.min(
         10,
         1 + Math.floor((Math.max(1,level) - 1) / 2)
       );
     }
 
+    function foodTargetCount(){
+      const multiplier = doubleFoodSteps > 0 ? 2 : 1;
+      return Math.min(20,baseFoodTargetCount()*multiplier);
+    }
+
     function bombTargetCount(){
       if(level < 8) return 0;
       return Math.min(4, 1 + Math.floor((level - 8) / 2));
+    }
+
+    function bonusTargetCount(){
+      if(level < 10) return 0;
+      if(level < 14) return 1;
+      return 2;
+    }
+
+    function bombCells(bomb){
+      return [
+        {x:bomb.x,y:bomb.y},
+        {x:bomb.x+1,y:bomb.y},
+        {x:bomb.x,y:bomb.y+1},
+        {x:bomb.x+1,y:bomb.y+1}
+      ];
+    }
+
+    function bombContains(bomb,p){
+      return (
+        p.x >= bomb.x &&
+        p.x <= bomb.x+1 &&
+        p.y >= bomb.y &&
+        p.y <= bomb.y+1
+      );
     }
 
     function bombShrinkAmount(){
@@ -464,7 +499,8 @@
       const occupied = new Set([
         ...snake.map(pointKey),
         ...foods.map(pointKey),
-        ...bombs.map(pointKey)
+        ...bombs.flatMap(bombCells).map(pointKey),
+        ...bonuses.map(b=>pointKey(b))
       ]);
       const head = snake[0];
       const tail = snake[snake.length-1];
@@ -633,30 +669,58 @@
       plannedPath = [];
     }
 
-    function addOneBomb(){
-      const occupied = new Set([
+    function occupiedHazardCells(){
+      return new Set([
         ...snake.map(pointKey),
         ...foods.map(pointKey),
-        ...bombs.map(pointKey)
+        ...bombs.flatMap(bombCells).map(pointKey),
+        ...bonuses.map(b=>pointKey(b))
       ]);
+    }
 
+    function addOneBomb(){
+      const occupied = occupiedHazardCells();
       const head = snake[0];
-      const candidates = cycle.filter(p=>{
-        const pk = pointKey(p);
-        if(occupied.has(pk)) return false;
-        if(obstacles.has(pk)) return false;
+      const candidates = [];
 
-        const distance =
-          Math.abs(p.x-head.x) +
-          Math.abs(p.y-head.y);
+      for(let y=0;y<ROWS-1;y++){
+        for(let x=0;x<COLS-1;x++){
+          const cells = [
+            {x,y},
+            {x:x+1,y},
+            {x,y:y+1},
+            {x:x+1,y:y+1}
+          ];
 
-        return distance >= 6;
-      });
+          const valid = cells.every(cell=>{
+            const key = pointKey(cell);
+            return (
+              cycleIndex.has(key) &&
+              !obstacles.has(key) &&
+              !occupied.has(key)
+            );
+          });
+
+          if(!valid) continue;
+
+          const distance =
+            Math.abs(x-head.x) +
+            Math.abs(y-head.y);
+
+          if(distance >= 7){
+            candidates.push({x,y});
+          }
+        }
+      }
 
       if(!candidates.length) return false;
 
+      const pick =
+        candidates[Math.floor(Math.random()*candidates.length)];
+
       bombs.push({
-        ...candidates[Math.floor(Math.random()*candidates.length)]
+        ...pick,
+        ttl:BOMB_LIFETIME_STEPS
       });
 
       return true;
@@ -674,9 +738,114 @@
       }
     }
 
+    function addOneBonus(){
+      const occupied = occupiedHazardCells();
+      const head = snake[0];
+
+      const candidates = cycle.filter(p=>{
+        const key = pointKey(p);
+        if(occupied.has(key)) return false;
+        if(obstacles.has(key)) return false;
+
+        const distance =
+          Math.abs(p.x-head.x) +
+          Math.abs(p.y-head.y);
+
+        return distance >= 5;
+      });
+
+      if(!candidates.length) return false;
+
+      const pick =
+        candidates[Math.floor(Math.random()*candidates.length)];
+
+      const type =
+        Math.random() < 0.5
+          ? 'double-points'
+          : 'double-food';
+
+      bonuses.push({
+        ...pick,
+        type,
+        ttl:BONUS_LIFETIME_STEPS
+      });
+
+      return true;
+    }
+
+    function ensureBonusCount(){
+      const target = bonusTargetCount();
+
+      while(bonuses.length < target){
+        if(!addOneBonus()) break;
+      }
+
+      if(bonuses.length > target){
+        bonuses = bonuses.slice(0,target);
+      }
+    }
+
+    function tickTimedItems(){
+      for(const bomb of bombs){
+        bomb.ttl--;
+      }
+
+      bombs = bombs.filter(bomb=>bomb.ttl>0);
+
+      for(const bonus of bonuses){
+        bonus.ttl--;
+      }
+
+      bonuses = bonuses.filter(bonus=>bonus.ttl>0);
+
+      if(doublePointsSteps > 0) doublePointsSteps--;
+      if(doubleFoodSteps > 0) doubleFoodSteps--;
+
+      ensureBombCount();
+      ensureBonusCount();
+
+      if(doubleFoodSteps > 0){
+        ensureFoodCount();
+      }
+    }
+
+    function activateBonus(bonus){
+      if(bonus.type === 'double-points'){
+        doublePointsSteps = BONUS_EFFECT_STEPS;
+        hazardMessage = 'BONUS! ×2 POINTS';
+      }else{
+        doubleFoodSteps = BONUS_EFFECT_STEPS;
+        hazardMessage = 'BONUS! DOUBLE FOOD';
+        ensureFoodCount();
+      }
+
+      hazardMessageUntil = Date.now() + 1200;
+      plannedPath = [];
+      beep(980,0.06);
+      setTimeout(()=>beep(1220,0.08),70);
+    }
+
+    function nearestBonusPath(){
+      if(closingMode || !bonuses.length) return null;
+
+      let best = null;
+
+      for(const bonus of bonuses){
+        const path = orderedPathTo(bonus);
+        if(!path.length) continue;
+
+        if(!best || path.length < best.path.length){
+          best = {bonus,path};
+        }
+      }
+
+      return best;
+    }
+
     function spawnFood(){
       ensureFoodCount();
       ensureBombCount();
+      ensureBonusCount();
     }
 
     function orderedPathTo(target){
@@ -772,7 +941,7 @@
     function chooseMove(){
       const fillRatio = snake.length / cycle.length;
 
-      if(!closingMode && fillRatio >= 0.70){
+      if(!closingMode && fillRatio >= 0.85){
         activateClosingMode();
       }
 
@@ -780,6 +949,22 @@
         const head = snake[0];
         const hi = cycleIndex.get(pointKey(head));
         return {...cycle[(hi+1)%cycle.length]};
+      }
+
+      const bonusChoice = nearestBonusPath();
+
+      if(bonusChoice){
+        const currentFoodPath = food
+          ? orderedPathTo(food)
+          : [];
+
+        if(
+          !currentFoodPath.length ||
+          bonusChoice.path.length <= currentFoodPath.length + 8
+        ){
+          plannedPath = [];
+          return bonusChoice.path[0];
+        }
       }
 
       if(plannedPath.length){
@@ -837,9 +1022,11 @@
         directionName(snake[0],next)
       );
       const eatenIndex = foods.findIndex(f=>same(next,f));
-      const bombIndex = bombs.findIndex(b=>same(next,b));
+      const bombIndex = bombs.findIndex(b=>bombContains(b,next));
+      const bonusIndex = bonuses.findIndex(b=>same(next,b));
       const willEat = eatenIndex >= 0;
       const hitBomb = bombIndex >= 0;
+      const hitBonus = bonusIndex >= 0;
       const oldLength = snake.length;
       const blockedBody = new Set((willEat ? snake : snake.slice(0,-1)).map(pointKey));
 
@@ -877,6 +1064,12 @@
 
         ensureBombCount();
         chooseFoodTarget();
+      }else if(hitBonus){
+        const bonus = bonuses[bonusIndex];
+        bonuses.splice(bonusIndex,1);
+        activateBonus(bonus);
+        ensureBonusCount();
+        snake.pop();
       }else if(willEat){
         const ateActiveTarget =
           food && same(foods[eatenIndex],food);
@@ -889,7 +1082,7 @@
         }
 
         foodCount++;
-        points += level;
+        points += level * (doublePointsSteps > 0 ? 2 : 1);
         beep(720,0.03);
 
         if(snake.length >= cycle.length){
@@ -904,6 +1097,7 @@
         snake.pop();
       }
 
+      tickTimedItems();
       updateHud();
       draw();
       timer = setTimeout(step,levelDelay());
@@ -935,6 +1129,9 @@
       foods = [];
       food = null;
       bombs = [];
+      bonuses = [];
+      doublePointsSteps = 0;
+      doubleFoodSteps = 0;
       hazardMessage = '';
       hazardMessageUntil = 0;
       currentDirection = null;
@@ -972,6 +1169,7 @@
       foods = [];
       food = null;
       bombs = [];
+      bonuses = [];
 
       beep(900,.08);
       setTimeout(()=>beep(1080,.1),100);
@@ -1044,11 +1242,14 @@
         const bombLabel = bombs.length
           ? ' • ' + bombs.length + ' BOMB' + (bombs.length === 1 ? '' : 'S')
           : '';
+        const effectLabel =
+          (doublePointsSteps > 0 ? ' • ×2 PTS' : '') +
+          (doubleFoodSteps > 0 ? ' • DOUBLE FOOD' : '');
 
         statusEl.textContent =
           obstacleCells
-            ? 'AUTO HUNT • ' + foodLabel + bombLabel + ' • OBSTACLES'
-            : 'AUTO HUNT • ' + foodLabel + bombLabel;
+            ? 'AUTO HUNT • ' + foodLabel + bombLabel + effectLabel + ' • OBSTACLES'
+            : 'AUTO HUNT • ' + foodLabel + bombLabel + effectLabel;
       }
     }
 
@@ -1114,15 +1315,47 @@
       for(const bomb of bombs){
         const px=bomb.x*CELL;
         const py=bomb.y*CELL;
+        const size=CELL*2;
+        const countdown=Math.max(
+          1,
+          Math.ceil(bomb.ttl/(BOMB_LIFETIME_STEPS/5))
+        );
 
         ctx.fillStyle=PIXEL;
-        ctx.fillRect(px+2,py+2,4,4);
-        ctx.fillRect(px+1,py+3,6,2);
-        ctx.fillRect(px+3,py+1,2,6);
-        ctx.fillRect(px+5,py,2,2);
+        ctx.fillRect(px+1,py+1,size-2,size-2);
 
         ctx.fillStyle=LCD;
-        ctx.fillRect(px+3,py+3,2,2);
+        ctx.fillRect(px+3,py+3,size-6,size-6);
+
+        ctx.fillStyle=PIXEL;
+        ctx.font='bold 9px monospace';
+        ctx.textAlign='center';
+        ctx.textBaseline='middle';
+        ctx.fillText(
+          String(countdown),
+          px+size/2,
+          py+size/2+0.5
+        );
+      }
+    }
+
+    function drawBonuses(){
+      for(const bonus of bonuses){
+        const px=bonus.x*CELL;
+        const py=bonus.y*CELL;
+
+        ctx.fillStyle=PIXEL;
+        ctx.fillRect(px+1,py+1,CELL-2,CELL-2);
+
+        ctx.fillStyle=LCD;
+        ctx.font='bold 5px monospace';
+        ctx.textAlign='center';
+        ctx.textBaseline='middle';
+        ctx.fillText(
+          bonus.type === 'double-points' ? '2X' : 'F+',
+          px+CELL/2,
+          py+CELL/2+0.5
+        );
       }
     }
 
@@ -1138,6 +1371,7 @@
       }
 
       drawFood();
+      drawBonuses();
       drawBombs();
 
       for(let i=snake.length-1;i>=0;i--){
