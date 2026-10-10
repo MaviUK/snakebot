@@ -326,6 +326,14 @@
       return out;
     }
 
+    function closureWindowSize(fillRatio){
+      if(fillRatio >= 0.92) return 6;
+      if(fillRatio >= 0.84) return 14;
+      if(fillRatio >= 0.74) return 30;
+      if(fillRatio >= 0.64) return 54;
+      return Infinity;
+    }
+
     function spawnFood(){
       plannedPath = [];
 
@@ -335,20 +343,38 @@
       const headIndex = cycleIndex.get(pointKey(head));
       const tailIndex = cycleIndex.get(pointKey(tail));
       const tailGap = forwardDistance(headIndex, tailIndex);
-      const safetyMargin = Math.min(8, Math.max(1, Math.floor(snake.length * 0.01)));
+      const fillRatio = snake.length / cycle.length;
+      const safetyMargin = Math.min(
+        8,
+        Math.max(1, Math.floor(snake.length * 0.01))
+      );
 
-      const safeFree = cycle.filter(p=>{
-        const pk = pointKey(p);
-        if(occupied.has(pk)) return false;
+      let safeFree = cycle
+        .filter(p=>{
+          const pk = pointKey(p);
+          if(occupied.has(pk)) return false;
 
-        const idx = cycleIndex.get(pk);
-        const advance = forwardDistance(headIndex, idx);
+          const idx = cycleIndex.get(pk);
+          const advance = forwardDistance(headIndex, idx);
 
-        return advance > 0 && advance < Math.max(1, tailGap - safetyMargin);
-      });
+          return (
+            advance > 0 &&
+            advance < Math.max(1, tailGap - safetyMargin)
+          );
+        })
+        .map(p=>({
+          p,
+          advance:forwardDistance(
+            headIndex,
+            cycleIndex.get(pointKey(p))
+          )
+        }))
+        .sort((a,b)=>a.advance-b.advance);
 
       if(!safeFree.length){
-        const anyFree = cycle.filter(p=>!occupied.has(pointKey(p)));
+        const anyFree = cycle.filter(
+          p=>!occupied.has(pointKey(p))
+        );
 
         if(!anyFree.length){
           food = null;
@@ -360,47 +386,65 @@
         return;
       }
 
-      const shuffled = safeFree.slice();
+      const windowSize = closureWindowSize(fillRatio);
 
-      for(let i=shuffled.length-1;i>0;i--){
-        const j = Math.floor(Math.random()*(i+1));
-        [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];
+      if(Number.isFinite(windowSize)){
+        safeFree = safeFree.slice(
+          0,
+          Math.min(windowSize,safeFree.length)
+        );
       }
 
-      const sample = shuffled.slice(0, Math.min(36, shuffled.length));
-      const good = [];
       let best = null;
 
-      for(const candidate of sample){
+      for(let i=0;i<safeFree.length;i++){
+        const candidate = safeFree[i].p;
         const path = orderedPathTo(candidate);
+
         if(!path.length) continue;
 
         const manhattan =
           Math.abs(head.x-candidate.x) +
           Math.abs(head.y-candidate.y);
 
-        const detourRatio = path.length / Math.max(1, manhattan);
+        const detourRatio =
+          path.length / Math.max(1,manhattan);
 
-        if(!best || detourRatio < best.ratio){
-          best = {candidate,path,ratio:detourRatio};
-        }
+        const gapPenalty =
+          fillRatio < 0.64
+            ? 0
+            : i * (
+                fillRatio >= 0.92 ? 2.5 :
+                fillRatio >= 0.84 ? 1.35 :
+                fillRatio >= 0.74 ? 0.65 :
+                0.25
+              );
 
-        if(detourRatio <= 1.35){
-          good.push({candidate,path});
+        const distancePenalty =
+          safeFree[i].advance *
+          (fillRatio >= 0.84 ? 0.018 : 0.006);
+
+        const score =
+          detourRatio +
+          gapPenalty +
+          distancePenalty;
+
+        if(!best || score < best.score){
+          best = {
+            candidate,
+            path,
+            score
+          };
         }
       }
 
-      const pick = good.length
-        ? good[Math.floor(Math.random()*good.length)]
-        : best;
-
-      if(pick){
-        food = {...pick.candidate};
-        plannedPath = pick.path.slice();
+      if(best){
+        food = {...best.candidate};
+        plannedPath = best.path.slice();
         return;
       }
 
-      food = {...safeFree[Math.floor(Math.random()*safeFree.length)]};
+      food = {...safeFree[0].p};
     }
 
     function orderedPathTo(target){
@@ -649,8 +693,19 @@
       progressBar.style.width =
         ((snake.length/total)*100).toFixed(1)+'%';
 
-      statusEl.textContent =
-        obstacleCells ? 'AUTO HUNT • OBSTACLES' : 'AUTO HUNT';
+      const fillRatio = snake.length / total;
+
+      if(fillRatio >= 0.74){
+        statusEl.textContent =
+          obstacleCells
+            ? 'CLOSING AREAS • OBSTACLES'
+            : 'CLOSING AREAS';
+      }else{
+        statusEl.textContent =
+          obstacleCells
+            ? 'AUTO HUNT • OBSTACLES'
+            : 'AUTO HUNT';
+      }
     }
 
     function drawGrid(){
