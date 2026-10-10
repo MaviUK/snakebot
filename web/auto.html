@@ -554,7 +554,8 @@
         const occupied = new Set([
           ...snake.map(pointKey),
           ...foods.map(pointKey),
-          ...bombs.map(pointKey)
+          ...bombs.flatMap(bombCells).map(pointKey),
+          ...bonuses.map(b=>pointKey(b))
         ]);
 
         const anyFree = cycle.filter(
@@ -1228,15 +1229,18 @@
 
       if(closingMode){
         const straightened = closureSteps >= snake.length;
+        const effectLabel =
+          (doublePointsSteps > 0 ? ' • ×2 PTS' : '') +
+          (doubleFoodSteps > 0 ? ' • DOUBLE FOOD' : '');
 
         statusEl.textContent =
           straightened
             ? (obstacleCells
-                ? 'CLOSING LINES • OBSTACLES'
-                : 'CLOSING LINES')
+                ? 'CLOSING LINES' + effectLabel + ' • OBSTACLES'
+                : 'CLOSING LINES' + effectLabel)
             : (obstacleCells
-                ? 'STRAIGHTENING • OBSTACLES'
-                : 'STRAIGHTENING LINES');
+                ? 'STRAIGHTENING' + effectLabel + ' • OBSTACLES'
+                : 'STRAIGHTENING LINES' + effectLabel);
       }else{
         const foodLabel = foods.length + ' FOOD';
         const bombLabel = bombs.length
