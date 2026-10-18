@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#061422">
+<title>Snake LIVE - autonomous TikTok game</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:#e9f7ff;background:#061321;font-synthesis:none}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 20% 5%,#174f67 0,#08172a 42%,#050b16 100%);}
+button,input{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible{outline:3px solid #7fe2fa;outline-offset:2px}
+.site-head{max-width:1150px;margin:auto;padding:28px 22px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.eyebrow{letter-spacing:.2em;text-transform:uppercase;color:#8de7fb;font-size:11px;font-weight:800}.site-head h1{margin:4px 0 6px;font-size:clamp(27px,4vw,38px);letter-spacing:-.06em;line-height:1.04}
+.site-head p{margin:0;color:#a5bfcf;font-size:14px;max-width:650px}.tag{border:1px solid #375770;border-radius:100px;padding:9px 12px;color:#aee5ed;background:#10293b;white-space:nowrap;font-size:11px;font-weight:800}
+.layout{max-width:1150px;display:grid;grid-template-columns:minmax(290px,462px) minmax(305px,1fr);gap:26px;align-items:start;margin:0 auto;padding:12px 22px 48px}
+.stage{display:flex;flex-direction:column;align-items:center;gap:10px}.stage-note{font-size:12px;color:#81a2b5;text-align:center}
+.stream{position:relative;aspect-ratio:9/16;width:100%;max-width:462px;overflow:hidden;border:3px solid #51bde5;border-radius:21px;background:#061b38;box-shadow:0 32px 74px #0009,0 0 0 6px #4ce4fd15;display:flex;flex-direction:column;isolation:isolate}
+.stream:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 65% 4%,#136bb875,transparent 45%);pointer-events:none;z-index:-1}
+.stream-header{flex:0 0 auto;min-height:105px;display:flex;flex-direction:column;justify-content:center;padding:14px 17px 10px;background:linear-gradient(180deg,#041a36f2,#09244bef);border-bottom:2px solid #38add3}
+.top-line{display:flex;align-items:center;justify-content:space-between;gap:8px}.brand{font-weight:1000;font-style:italic;letter-spacing:-.045em;font-size:clamp(24px,6vw,32px);line-height:1;text-shadow:0 3px #013f70}
+.brand em{font-style:normal;color:#ff7a21;text-shadow:2px 2px #8c2e13}.pill{display:inline-flex;align-items:center;gap:6px;border-radius:100px;padding:6px 9px;background:#a61f43;color:white;font-size:10px;font-weight:900;letter-spacing:.1em}
+.pulse{width:6px;height:6px;background:#fff;border-radius:50%;box-shadow:0 0 9px #fff}
+.stat-row{margin-top:12px;display:flex;justify-content:space-between;gap:6px}.stat{display:flex;flex-direction:column;min-width:0}.stat strong{font-size:clamp(18px,4.5vw,25px);line-height:1.05;letter-spacing:-.035em}.stat small{font-size:9px;font-weight:800;color:#93bdce;letter-spacing:.14em}
+.board-wrap{position:relative;min-height:0;flex:1;overflow:hidden;background:linear-gradient(180deg,#3ac7e2 0%,#1cadd6 45%,#187eae 100%)}
+canvas{display:block;width:100%;height:100%;object-fit:fill}
+.float-alert{position:absolute;left:9px;right:9px;top:13px;z-index:3;pointer-events:none;display:flex;justify-content:center;transition:opacity .25s,transform .25s;opacity:0;transform:translateY(-12px)}.float-alert.show{opacity:1;transform:translateY(0)}
+.alert-card{border:2px solid #f2ffff;background:#051b3be9;box-shadow:0 8px 20px #005a87c7,0 0 22px #fff4;border-radius:11px;padding:9px 16px;max-width:98%;text-align:center;font-size:14px;font-weight:900;overflow:hidden;text-overflow:ellipsis}
+.alert-card span{color:#ffb468}
+.impact-banner{position:absolute;bottom:16px;left:0;right:0;display:flex;justify-content:center;pointer-events:none;font-weight:1000;color:#fff;font-size:28px;text-shadow:2px 3px #3b0d1a;letter-spacing:.05em;opacity:0;transform:scale(.7);transition:opacity .18s,transform .18s}.impact-banner.show{opacity:1;transform:scale(1)}
+.stream-footer{min-height:122px;flex:0 0 auto;padding:12px 14px 11px;background:linear-gradient(180deg,#0c2448,#041730)}
+.gift-heading{font-size:10px;letter-spacing:.14em;font-weight:900;color:#75dbea;margin:0 0 7px}.gift-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.gift-chip{display:flex;align-items:center;gap:7px;background:#14395b;border:1px solid #245985;border-radius:8px;padding:6px 7px;min-width:0}.gift-emoji{font-size:19px;flex:0 0 auto}.gift-info{min-width:0}.gift-info b{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1}.gift-info small{display:block;color:#9bcbdc;font-size:9px;margin-top:2px;line-height:1.15}
+.control-panel{border-radius:19px;border:1px solid #29465e;background:#091e32ea;box-shadow:0 16px 50px #0005;overflow:hidden}.section{padding:19px 20px;border-bottom:1px solid #29465e}.section:last-child{border:0}.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.section h2{font-size:15px;letter-spacing:-.025em;margin:0}.muted{margin:0;font-size:12px;line-height:1.55;color:#a2bed0}.status{font-size:10px;font-weight:900;letter-spacing:.03em;border:1px solid #517183;background:#223b4d;color:#c1dce4;padding:6px 8px;border-radius:100px;white-space:nowrap}.status.ok{color:#8af7bc;border-color:#387857;background:#103c32}.status.wait{color:#ffd393;border-color:#735c35;background:#41311b}
+.buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.btn{border:1px solid #316586;border-radius:10px;background:#123653;color:#d5f2fd;font-size:12px;font-weight:800;padding:10px 12px;min-height:41px}.btn.primary{background:#ff7526;border-color:#fb994c;color:#101d29}.btn.positive{background:#095950;border-color:#17a691}.btn.danger{background:#5e263d;border-color:#c64c70}.btn:hover{filter:brightness(1.13)}.btn:active{transform:translateY(1px)}
+label.field{display:block;margin:12px 0 0;color:#d2e9f2;font-weight:700;font-size:11px}.field input{display:block;width:100%;margin-top:5px;border-radius:9px;border:1px solid #365a72;background:#051524;color:white;padding:10px 11px;outline-offset:2px;font-size:13px}.field input:focus{border-color:#5adbef}.config-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 11px}.check{display:flex;align-items:center;gap:9px;font-size:12px;color:#c7e5ed;margin-top:13px;cursor:pointer}.check input{accent-color:#20c69f;width:16px;height:16px}
+.speed-row{margin-top:12px;display:flex;align-items:center;gap:10px}.speed-row span{font-size:12px;white-space:nowrap;color:#aac8d6}.speed-row input{width:100%;accent-color:#fa8d40}.mini-event{display:flex;gap:9px;align-items:flex-start;border-bottom:1px solid #254257;padding:9px 0}.mini-event:last-child{border:0}.mini-icon{font-size:19px}.mini-event strong{font-size:11px;display:block}.mini-event small{display:block;font-size:11px;color:#96b6c8;margin-top:1px}.log{min-height:70px;max-height:170px;overflow:auto}.empty{padding:17px 0;color:#7b9fb0;font-size:12px}.linkbox{display:flex;align-items:stretch;gap:7px;margin-top:12px;min-width:0}.linkbox input{min-width:0;flex:1;border:1px solid #396583;border-radius:9px;background:#041524;color:#aee3ff;padding:10px;font-size:11px}.linkbox button{white-space:nowrap}.hint{color:#92aec0;font-size:11px;line-height:1.5;margin:10px 0 0}
+@media(max-width:800px){.layout{grid-template-columns:1fr;gap:20px}.site-head{padding-top:22px}.stream{width:min(100%,430px)}.control-panel{max-width:630px;width:100%;margin:auto}.stage-note{max-width:410px}}@media(max-width:450px){.layout{padding:8px 10px 28px}.site-head{padding:17px 12px 10px}.tag{display:none}.control-panel{border-radius:13px}.section{padding:15px}.brand{font-size:25px}.stat strong{font-size:22px}.stream{border-radius:13px}}@media(prefers-reduced-motion:reduce){.float-alert,.impact-banner{transition:none}}
+body.overlay-mode{background:transparent;margin:0;overflow:hidden}body.overlay-mode .site-head,body.overlay-mode .control-panel,body.overlay-mode .stage-note{display:none}body.overlay-mode .layout{margin:0;padding:0;display:block;width:100%;height:100vh;max-width:none}body.overlay-mode .stage{height:100%;width:100%}body.overlay-mode .stream{border:0;border-radius:0;box-shadow:none;max-width:none;width:min(100vw,56.25vh);height:min(100vh,177.778vw);aspect-ratio:9/16}@media (max-aspect-ratio:9/16){body.overlay-mode .stream{width:100vw;height:100vh}}
+</style>
+</head>
+<body>
+<header class="site-head"><div><div class="eyebrow">Your self-playing livestream game</div><h1>Snake LIVE studio</h1><p>The snake plays itself. Viewers control what appears on the board through TikTok LIVE gifts.</p></div><div class="tag">NEW · LIVE MODE</div></header>
+<main class="layout">
+<section class="stage" aria-label="Live stream game preview">
+ <div class="stream" id="stream">
+  <div class="stream-header">
+   <div class="top-line"><div class="brand">SNAKE <em>LIVE</em></div><div class="pill"><i class="pulse"></i> AUTOMATIC</div></div>
+   <div class="stat-row"><div class="stat"><strong id="points">0</strong><small>SCORE</small></div><div class="stat"><strong id="length">4</strong><small>LENGTH</small></div><div class="stat"><strong id="round">01</strong><small>ROUND</small></div><div class="stat"><strong id="hits">0</strong><small>BOMB HITS</small></div></div>
+  </div>
+  <div class="board-wrap"><canvas id="game" width="480" height="600" aria-label="Automatic Snake game board"></canvas><div id="alert" class="float-alert" aria-live="polite"><div class="alert-card" id="alertText"></div></div><div id="impact" class="impact-banner">BOOM!</div></div>
+  <div class="stream-footer"><div class="gift-heading">VIEWERS CONTROL THE GAME</div><div class="gift-grid">
+   <div class="gift-chip"><span class="gift-emoji">🌹</span><div class="gift-info"><b id="legendApple">Rose</b><small>+2 apples</small></div></div>
+   <div class="gift-chip"><span class="gift-emoji">💖</span><div class="gift-info"><b id="legendBonus">Finger Heart</b><small>+6 apples</small></div></div>
+   <div class="gift-chip"><span class="gift-emoji">💣</span><div class="gift-info"><b id="legendBomb">Perfume</b><small>Drop a bomb</small></div></div>
+   <div class="gift-chip"><span class="gift-emoji">☄️</span><div class="gift-info"><b id="legendStorm">Galaxy</b><small>Bomb storm</small></div></div>
+  </div></div>
+ </div>
+ <div class="stage-note">Preview is running automatically. Use the controls to test gifts before going live.</div>
+</section>
+<aside class="control-panel" aria-label="Game settings">
+ <section class="section"><div class="section-head"><h2>TikFinity connection</h2><span class="status wait" id="connection">Checking…</span></div><p class="muted" id="connectionHelp">TikFinity Desktop needs to be open and connected to your live stream on the same PC. No separate API key required.</p><div class="buttons"><button class="btn primary" id="connect">Connect to TikFinity</button><button class="btn" id="pause">Pause game</button><button class="btn" id="restart">Restart round</button></div></section>
+ <section class="section"><div class="section-head"><h2>Test viewer actions</h2><span class="status">DEMO</span></div><p class="muted">These buttons simulate gifts without spending money.</p><div class="buttons"><button class="btn positive" id="testApple">🌹 Add apples</button><button class="btn positive" id="testBonus">💖 Lots of apples</button><button class="btn danger" id="testBomb">💣 Drop bomb</button><button class="btn danger" id="testStorm">☄️ Bomb storm</button><button class="btn" id="testShield">🛡️ Shield</button></div></section>
+ <section class="section"><h2>Which gift does what?</h2><p class="hint">Type the exact TikTok gift names available in your region. Changes apply to the preview and the overlay link.</p><div class="config-grid"><label class="field">+2 apples<input id="giftApple" maxlength="70" autocomplete="off"></label><label class="field">+6 apples<input id="giftBonus" maxlength="70" autocomplete="off"></label><label class="field">Drop bomb<input id="giftBomb" maxlength="70" autocomplete="off"></label><label class="field">Bomb storm<input id="giftStorm" maxlength="70" autocomplete="off"></label></div><label class="check"><input id="chatApple" type="checkbox">Allow free chat <b>apple</b> (one per viewer per 30 seconds)</label><label class="check"><input id="chatBomb" type="checkbox">Allow free chat <b>bomb</b> (one per viewer per 30 seconds)</label><div class="speed-row"><span>Snake speed</span><input id="speed" type="range" min="1" max="5" step="1"><span id="speedLabel">3 / 5</span></div></section>
+ <section class="section"><h2>LIVE Studio / OBS link</h2><p class="muted">Copy this link into a Link/Browser source on the same computer that runs TikFinity. Use portrait size 450 × 800 or 1080 × 1920.</p><div class="linkbox"><input id="overlayLink" aria-label="Livestream overlay URL" readonly><button id="copyLink" class="btn primary">Copy</button></div><p class="hint">If Chrome or LIVE Studio asks for permission to access a local network or localhost, allow it. The overlay connects directly to TikFinity on that PC.</p></section>
+ <section class="section"><h2>Recent viewer actions</h2><div class="log" id="log" aria-live="polite"><div class="empty">Waiting for gifts, chat commands or test events…</div></div></section>
+</aside>
+</main>
+<script>
+(function(){'use strict';
+ const C=24,R=30,S=20,N=C*R,WIDTH=C*S,HEIGHT=R*S,WS_URL='ws://127.0.0.1:21213/';
+ const $=id=>document.getElementById(id);const canvas=$('game'),ctx=canvas.getContext('2d');
+ const defaults={giftApple:'Rose',giftBonus:'Finger Heart',giftBomb:'Perfume',giftStorm:'Galaxy',chatApple:false,chatBomb:false,speed:3};
+ const names=['giftApple','giftBonus','giftBomb','giftStorm'];
+ const query=new URLSearchParams(location.search);const overlay=query.get('overlay')==='1';document.body.classList.toggle('overlay-mode',overlay);
+ let cfg={...defaults};try{const v=JSON.parse(localStorage.getItem('snakeLiveOptionsV1')||'null');if(v&&typeof v==='object')cfg={...cfg,...v}}catch(e){}
+ for(const name of names){const val=query.get(name);if(val!==null)cfg[name]=val.slice(0,70)}
+ for(const flag of ['chatApple','chatBomb']){if(query.has(flag))cfg[flag]=query.get(flag)==='1'}
+ if(query.has('speed'))cfg.speed=Number(query.get('speed'))||3;
+ cfg.speed=Math.max(1,Math.min(5,Math.floor(Number(cfg.speed)||3)));
+ for(const name of names)cfg[name]=String(cfg[name]||defaults[name]).slice(0,70);
+ const rc={snake:[],apples:[],bombs:[],particles:[],points:0,round:1,eaten:0,hits:0,grow:0,paused:false,step:0,lastEatenStep:0,shieldUntil:0,flashUntil:0,flashText:'',toastUntil:0,events:[],giftTotals:new Map()};
+ let socket=null,reconnectTimer=null,toastTimer=null,anim=0,moveTimer=null,streaks=new Map(),lastChat=new Map(),seen=new Map(),roomConnected=false;
+ const cycle=[];for(let x=0;x<C;x++)cycle.push({x,y:0});for(let x=C-1;x>=1;x--){if((C-1-x)%2===0){for(let y=1;y<R;y++)cycle.push({x,y})}else{for(let y=R-1;y>=1;y--)cycle.push({x,y})}}for(let y=R-1;y>=1;y--)cycle.push({x:0,y});
+ const cycleId=new Map(cycle.map((p,i)=>[p.x+','+p.y,i]));
+ if(cycle.length!==N)throw new Error('Autoplay cycle failed');
+ const k=p=>p.x+','+p.y;const id=p=>cycleId.get(k(p));const md=(a,b)=>Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
+ const rnd=n=>Math.floor(Math.random()*n);const same=(a,b)=>a.x===b.x&&a.y===b.y;
+ const delay=()=>({1:170,2:135,3:100,4:75,5:53})[cfg.speed];
+ function saveCfg(){if(!overlay){try{localStorage.setItem('snakeLiveOptionsV1',JSON.stringify(cfg))}catch(e){}}}
+ function spawnApple(n=1){let added=0;for(let i=0;i<Math.min(n,60);i++){if(rc.apples.length>=65)break;const busy=new Set(rc.snake.map(k).concat(rc.apples.map(k),rc.bombs.map(b=>k(b))));if(busy.size>=N-1)break;let p=null;for(let tries=0;tries<80;tries++){let cand=cycle[rnd(N)];if(!busy.has(k(cand))){p={...cand};break}}if(!p){p=cycle.find(q=>!busy.has(k(q)));if(p)p={...p}}if(!p)break;rc.apples.push(p);added++}return added}
+ function spawnBomb(n=1){let added=0;for(let i=0;i<Math.min(n,35);i++){if(rc.bombs.length>=45)break;const headI=id(rc.snake[0]);const busy=new Set(rc.snake.map(k).concat(rc.apples.map(k),rc.bombs.map(b=>k(b))));const options=[];for(let j=2;j<Math.min(N-4,105);j++){const p=cycle[(headI+j)%N];if(!busy.has(k(p)))options.push(p)}if(!options.length)break;const p=options[rnd(Math.min(options.length,23))];rc.bombs.push({x:p.x,y:p.y,expires:Date.now()+10000+Math.random()*5000,born:Date.now()});added++}return added}
+ function reset(full=false){if(full){rc.points=0;rc.round=1;rc.eaten=0;rc.hits=0;rc.events=[];rc.giftTotals.clear();renderLog()}rc.snake=[];const headIndex=12;for(let i=0;i<5;i++)rc.snake.push({...cycle[(headIndex-i+N)%N]});rc.apples=[];rc.bombs=[];rc.particles=[];rc.step=0;rc.shieldUntil=0;rc.flashUntil=0;spawnApple(12);hud()}
+ function hud(){$('points').textContent=rc.points.toLocaleString('en-GB');$('length').textContent=rc.snake.length.toString();$('round').textContent=String(rc.round).padStart(2,'0');$('hits').textContent=rc.hits.toString()}
+ function boom(p){rc.flashUntil=Date.now()+650;rc.flashText='BOOM!';for(let i=0;i<32;i++){const a=Math.random()*Math.PI*2;const speed=1+Math.random()*4;rc.particles.push({x:(p.x+.5)*S,y:(p.y+.5)*S,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,life:1,sz:2+Math.random()*6})}if(Date.now()>rc.shieldUntil){rc.hits++;const keep=Math.max(5,Math.floor(rc.snake.length*.7));rc.snake.length=keep;rc.points=Math.max(0,rc.points-30);notify('💥', 'BOMB HIT · SNAKE DAMAGED')}else notify('🛡️','SHIELD BLOCKED THE BOMB');hud()}
+ function chooseStep(){const head=rc.snake[0],hi=id(head),ti=id(rc.snake[rc.snake.length-1]);let gap=(ti-hi+N)%N;if(gap===0)gap=N;const occupied=new Set(rc.snake.slice(0,-1).map(k));const bombs=new Set(rc.bombs.map(k));const neighbors=[{x:head.x+1,y:head.y},{x:head.x-1,y:head.y},{x:head.x,y:head.y+1},{x:head.x,y:head.y-1}].filter(p=>p.x>=0&&p.x<C&&p.y>=0&&p.y<R&&!occupied.has(k(p)));
+ const opts=neighbors.map(p=>{const forward=(id(p)-hi+N)%N;const mine=bombs.has(k(p));const food=rc.apples.some(a=>same(a,p));let d=999;for(const a of rc.apples)d=Math.min(d,md(a,p));return{p,forward,mine,food,d,ordered:forward>0&&forward<gap}});
+ const safe=opts.filter(o=>o.ordered);const notMined=safe.filter(o=>!o.mine);let list=notMined.length?notMined:safe;
+ // Eventually follow the entire safe cycle, so distant apples are never permanently skipped.
+ if(rc.snake.length>120||rc.step-rc.lastEatenStep>480){const n=cycle[(hi+1)%N];const next=opts.find(o=>same(o.p,n)&&o.ordered&&!o.mine);if(next)return next.p}
+ if(!list.length)list=opts.filter(o=>!o.mine).length?opts.filter(o=>!o.mine):opts;
+ if(!list.length)return null;
+ // Eat nearby apples, but never jump ahead of the moving tail on the cycle.
+ const big=rc.snake.length>N*.64;
+ list.sort((a,b)=>{function rank(o){let r=o.d*5+o.forward*.09;if(o.food)r-=80;if(big)r+=o.forward*.4;if(o.mine)r+=1000;if(!o.ordered)r+=5000;return r}return rank(a)-rank(b)});
+ return list[0].p}
+ function step(){if(rc.paused)return;const now=Date.now();rc.bombs=rc.bombs.filter(b=>b.expires>now);if(rc.snake.length>N-8){rc.round++;notify('🏆','BOARD CLEARED · ROUND '+rc.round);reset();return}
+ const next=chooseStep();if(!next){rc.round++;notify('🔄','NEW ROUND · AUTOMATIC RESTART');reset();return}
+ const at=rc.apples.findIndex(a=>same(a,next));const b=rc.bombs.findIndex(m=>same(m,next));rc.snake.unshift(next);if(at!==-1){rc.apples.splice(at,1);rc.points+=10;rc.eaten++;rc.lastEatenStep=rc.step;rc.grow+=2;if(rc.eaten%35===0)rc.shieldUntil=now+4000}else if(rc.grow>0)rc.grow--;else rc.snake.pop();if(b!==-1){rc.bombs.splice(b,1);boom(next)}rc.step++;
+ if(rc.apples.length<10)spawnApple(12-rc.apples.length);
+ hud()}
+ function notify(icon,msg){$('alertText').textContent=icon+' '+msg;$('alert').classList.add('show');rc.toastUntil=Date.now()+2500;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('alert').classList.remove('show'),2500)}
+ function showAction(icon,user,action){let name=String(user||'Viewer').slice(0,38);notify(icon,name+' '+action);rc.events.unshift({icon,name,action,time:Date.now()});rc.events.length=Math.min(rc.events.length,12);renderLog()}
+ function renderLog(){const target=$('log');target.replaceChildren();if(!rc.events.length){const div=document.createElement('div');div.className='empty';div.textContent='Waiting for gifts, chat commands or test events…';target.append(div);return}for(const item of rc.events){const row=document.createElement('div');row.className='mini-event';const icon=document.createElement('span');icon.className='mini-icon';icon.textContent=item.icon;const col=document.createElement('div');const strong=document.createElement('strong');strong.textContent=item.name;const detail=document.createElement('small');detail.textContent=item.action;col.append(strong,detail);row.append(icon,col);target.append(row)}}
+ function trigger(action,user='Demo viewer',count=1){const n=Math.min(25,Math.max(1,Math.floor(Number(count)||1)));if(action==='apple'){spawnApple(2*n);showAction('🌹',user,'sent apples ×'+n)}if(action==='bonus'){spawnApple(6*n);showAction('💖',user,'sent a food boost ×'+n)}if(action==='bomb'){spawnBomb(n);showAction('💣',user,'dropped '+n+' bomb'+(n>1?'s':''))}if(action==='storm'){spawnBomb(Math.min(35,8*n));showAction('☄️',user,'launched a bomb storm!')}if(action==='shield'){rc.shieldUntil=Date.now()+12000;showAction('🛡️',user,'activated a 12-second shield')};hud()}
+ function cleanName(v){return String(v||'').trim().toLocaleLowerCase('en-GB')}
+ function onLiveEvent(packet){if(!packet||typeof packet!=='object')return;const type=String(packet.event||packet.type||'').toLowerCase();const d=packet.data||{};const user=String(d.user?.nickname||d.user?.uniqueId||d.nickname||d.uniqueId||'Viewer');
+ if(type==='gift'){
+  const gift=cleanName(d.giftName||d.gift?.name||d.giftDetails?.giftName||d.extendedGiftInfo?.name);if(!gift)return;
+  const giftType=Number(d.giftType??d.giftDetails?.giftType??0);
+  if(giftType===1&&d.repeatEnd===false)return;
+  const tx=String(d.transactionId||d.msgId||d.messageId||'');const dedupe=tx?tx+':'+gift:'';
+  if(dedupe&&seen.has(dedupe))return;if(dedupe)seen.set(dedupe,Date.now());
+  const count=Math.min(25,Math.max(1,Number(d.repeatCount)||1));
+  const match={giftApple:'apple',giftBonus:'bonus',giftBomb:'bomb',giftStorm:'storm'};
+  for(const field of Object.keys(match)){if(cleanName(cfg[field])===gift){trigger(match[field],user,count);break}}
+ }
+ if(type==='chat'){
+  const message=cleanName(d.comment||d.text).replace(/^!/,'');if(!((message==='apple'&&cfg.chatApple)||(message==='bomb'&&cfg.chatBomb)))return;
+  const key=String(d.user?.userId||d.userId||d.user?.uniqueId||d.uniqueId||user).slice(0,90),time=Date.now();if(time-(lastChat.get(key)||0)<30000)return;lastChat.set(key,time);trigger(message,user,1);
+ }
+ if(seen.size>1500){const limit=Date.now()-120000;for(const [key,t]of seen)if(t<limit)seen.delete(key)}
+ }
+ function setConnection(text,isOn=false){roomConnected=isOn;const el=$('connection');el.textContent=text;el.className='status '+(isOn?'ok':'wait');$('connect').textContent=isOn?'Reconnect TikFinity':'Connect to TikFinity';}
+ function connect(){clearTimeout(reconnectTimer);if(socket){socket.onclose=null;socket.close();socket=null}setConnection('CONNECTING…');try{socket=new WebSocket(WS_URL)}catch(e){setConnection('DEMO MODE');$('connectionHelp').textContent='Local connection blocked. Open TikFinity Desktop on the same PC and allow access to localhost in your browser.';reconnectTimer=setTimeout(connect,9000);return}
+ socket.onopen=()=>{setConnection('LIVE CONNECTED',true);$('connectionHelp').textContent='Receiving TikFinity events. Gifts will affect the game automatically.'};socket.onmessage=e=>{try{onLiveEvent(JSON.parse(e.data))}catch(err){console.warn('Ignored invalid TikFinity event')}};socket.onerror=()=>{setConnection('WAITING FOR APP')};socket.onclose=()=>{socket=null;setConnection('DEMO MODE');$('connectionHelp').textContent='Waiting for TikFinity Desktop on this PC. The game still plays itself without it.';reconnectTimer=setTimeout(connect,9000)}}
+ function updateLegend(){for(const [a,b] of [['legendApple','giftApple'],['legendBonus','giftBonus'],['legendBomb','giftBomb'],['legendStorm','giftStorm']])$(a).textContent=cfg[b]||defaults[b]}
+ function makeLink(){const url=new URL(location.href);url.search='';url.searchParams.set('overlay','1');for(const key of names)url.searchParams.set(key,cfg[key]);for(const flag of ['chatApple','chatBomb'])url.searchParams.set(flag,cfg[flag]?'1':'0');url.searchParams.set('speed',String(cfg.speed));$('overlayLink').value=url.toString()}
+ function readConfig(){for(const name of names)cfg[name]=$(name).value.trim().slice(0,70)||defaults[name];cfg.chatApple=$('chatApple').checked;cfg.chatBomb=$('chatBomb').checked;cfg.speed=Number($('speed').value)||3;$('speedLabel').textContent=cfg.speed+' / 5';updateLegend();saveCfg();makeLink()}
+ for(const name of names){$(name).value=cfg[name];$(name).addEventListener('change',readConfig);$(name).addEventListener('input',readConfig)}for(const flag of ['chatApple','chatBomb']){$(flag).checked=!!cfg[flag];$(flag).addEventListener('change',readConfig)}$('speed').value=cfg.speed;$('speed').addEventListener('input',readConfig);$('speedLabel').textContent=cfg.speed+' / 5';
+ for(const [button,action] of [['testApple','apple'],['testBonus','bonus'],['testBomb','bomb'],['testStorm','storm'],['testShield','shield']])$(button).addEventListener('click',()=>trigger(action));
+ $('connect').addEventListener('click',connect);$('pause').addEventListener('click',()=>{rc.paused=!rc.paused;$('pause').textContent=rc.paused?'Resume game':'Pause game'});$('restart').addEventListener('click',()=>{rc.round++;reset();notify('🔄','ROUND RESTARTED')});$('copyLink').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('overlayLink').value);$('copyLink').textContent='Copied!';setTimeout(()=>$('copyLink').textContent='Copy',1500)}catch(e){$('overlayLink').focus();$('overlayLink').select();$('copyLink').textContent='Select link'}});
+ function draw(){const now=Date.now(),w=WIDTH,h=HEIGHT;ctx.clearRect(0,0,w,h);
+ const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#47d5ed');bg.addColorStop(.5,'#2fb9df');bg.addColorStop(1,'#177dbb');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
+ ctx.lineWidth=1;ctx.strokeStyle='#e1fbff18';for(let x=0;x<=C;x++){ctx.beginPath();ctx.moveTo(x*S,0);ctx.lineTo(x*S,h);ctx.stroke()}for(let y=0;y<=R;y++){ctx.beginPath();ctx.moveTo(0,y*S);ctx.lineTo(w,y*S);ctx.stroke()}
+ ctx.strokeStyle='#ffffff1a';for(let j=0;j<21;j++){const x=(j*177)%w,y=(j*113)%h;ctx.beginPath();ctx.arc(x,y,9+j%5*3,Math.PI*.15,Math.PI*1.8);ctx.stroke()}
+ for(const a of rc.apples){const x=(a.x+.5)*S,y=(a.y+.5)*S;ctx.fillStyle='#813047';ctx.beginPath();ctx.ellipse(x+1,y+2,7,7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#f13e42';ctx.beginPath();ctx.arc(x,y,6.9,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ff9c99';ctx.beginPath();ctx.arc(x-2.3,y-2.4,2.3,0,Math.PI*2);ctx.fill();ctx.fillStyle='#287745';ctx.beginPath();ctx.ellipse(x+1.7,y-7,3,1.6,-.5,0,Math.PI*2);ctx.fill()}
+ for(const b of rc.bombs){const x=(b.x+.5)*S,y=(b.y+.5)*S,life=Math.max(0,(b.expires-now)/15000);ctx.save();ctx.shadowColor='#ff5c37';ctx.shadowBlur=7+7*Math.sin(now/130);ctx.fillStyle='#36234b';ctx.beginPath();ctx.arc(x,y,7.8,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.lineWidth=2;ctx.strokeStyle='#190e29';ctx.stroke();ctx.fillStyle='#ff78b1';ctx.beginPath();ctx.arc(x-2,y-2,2.2,0,7);ctx.fill();ctx.strokeStyle='#ffc060';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x+3,y-6);ctx.quadraticCurveTo(x+8,y-12,x+6,y-14);ctx.stroke();ctx.fillStyle=now%360<200?'#ffe073':'#ff6632';ctx.beginPath();ctx.arc(x+6,y-14,2.4,0,7);ctx.fill();ctx.restore()}
+ if(rc.snake.length){const pts=rc.snake.slice().reverse(),first=pts[0];ctx.beginPath();ctx.moveTo((first.x+.5)*S,(first.y+.5)*S);for(const p of pts.slice(1))ctx.lineTo((p.x+.5)*S,(p.y+.5)*S);ctx.lineCap='round';ctx.lineJoin='round';ctx.shadowColor='#87301c';ctx.shadowBlur=5;ctx.strokeStyle='#7d3116';ctx.lineWidth=18;ctx.stroke();ctx.shadowBlur=0;ctx.strokeStyle='#f46221';ctx.lineWidth=14;ctx.stroke();ctx.strokeStyle='#ff9a4d';ctx.lineWidth=8;ctx.stroke();ctx.strokeStyle='#ffd086';ctx.lineWidth=2.6;ctx.stroke();const head=rc.snake[0],neck=rc.snake[1]||head;let dx=head.x-neck.x,dy=head.y-neck.y;const hx=(head.x+.5)*S,hy=(head.y+.5)*S;ctx.save();ctx.translate(hx,hy);ctx.rotate(Math.atan2(dy,dx));ctx.fillStyle=Date.now()<rc.shieldUntil?'#bbff7a':'#aafa62';ctx.strokeStyle='#3b9e2b';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,0,11,8.5,0,0,Math.PI*2);ctx.fill();ctx.stroke();for(const y of [-4,4]){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(3,y,3.1,0,Math.PI*2);ctx.fill();ctx.fillStyle='#072a38';ctx.beginPath();ctx.arc(4,y,1.6,0,Math.PI*2);ctx.fill()}ctx.restore()}
+ if(now<rc.shieldUntil){const head=rc.snake[0];ctx.beginPath();ctx.arc((head.x+.5)*S,(head.y+.5)*S,17+Math.sin(now/120)*1.5,0,Math.PI*2);ctx.strokeStyle='#d4ff9a';ctx.lineWidth=2;ctx.stroke()}
+ for(let i=rc.particles.length-1;i>=0;i--){const p=rc.particles[i];p.x+=p.vx;p.y+=p.vy;p.life-=.025;ctx.fillStyle='rgba(255,'+Math.floor(112+p.life*120)+',30,'+Math.max(0,p.life)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.sz*p.life,0,7);ctx.fill();if(p.life<=0)rc.particles.splice(i,1)}
+ if(now<rc.flashUntil){ctx.fillStyle='rgba(255,95,45,'+(rc.flashUntil-now)/2300+')';ctx.fillRect(0,0,w,h);$('impact').textContent=rc.flashText;$('impact').classList.add('show')}else $('impact').classList.remove('show');
+ if(rc.paused){ctx.fillStyle='#041c349e';ctx.fillRect(0,0,w,h);ctx.textAlign='center';ctx.font='bold 36px system-ui';ctx.fillStyle='#fff';ctx.fillText('PAUSED',w/2,h/2)}
+ anim=requestAnimationFrame(draw)}
+ function loop(){step();moveTimer=setTimeout(loop,delay())}
+ updateLegend();makeLink();reset(true);draw();loop();connect();
+ // Diagnostic hook for local browser tests, never displayed to viewers.
+ if(query.has('test'))window.__snakeLiveTest={step,trigger,onLiveEvent,reset,state:()=>({length:rc.snake.length,points:rc.points,round:rc.round,hits:rc.hits,apples:rc.apples.length,bombs:rc.bombs.length,head:rc.snake[0],connected:roomConnected,paused:rc.paused}),cycle};
+})();
+</script>
+</body>
+</html>
